@@ -3,6 +3,7 @@
   "default_profile": "internal",
   "applications": {
     "oppgave1": {
+      "public_without_data": true,
       "public_with_current_data": false,
       "reason": "Inneholder interne regnskaps- og budsjettaggregater.",
       "allowed_parquet": [
@@ -12,15 +13,18 @@
       "allowed_xlsx": []
     },
     "oppgave2": {
+      "public_without_data": true,
       "public_with_current_data": false,
       "reason": "Inneholder konto-, hovedbok- og budsjettdetaljer.",
       "allowed_parquet": [
         "grouped_finance_rows.parquet",
-        "grouped_finance_validation.parquet"
+        "grouped_finance_validation.parquet",
+        "task2-report.parquet"
       ],
       "allowed_xlsx": []
     },
     "oppgave3": {
+      "public_without_data": true,
       "public_with_current_data": false,
       "reason": "Inneholder faktura-, leverandør-, bilags- og brukeridentifikatorer.",
       "requires_authenticated_hosting": true,

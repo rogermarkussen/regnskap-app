@@ -23,20 +23,22 @@ Kjør fra `oppgave2/kode/`:
 npm run refresh
 ```
 
-Kommandoen beregner rapporten fra operative kilder, avstemmer mot fasit,
-oppdaterer Evidence-kildene og bygger applikasjonen.
+Kommandoen beregner rapporten fra operative kilder, avstemmer mot fasit, lager
+den komprimerte Parquet-filen for nettleseren og bygger Vite-applikasjonen.
 
 ## Automatiske kontroller
 
 Bygget kontrollerer at:
 
-- begge finansieringsvalgene finnes;
+- alle finansierings-, periode- og seksjonsvalg finnes;
 - hver rapport har én totalrad for driftskostnader;
 - budsjett minus hovedbok er lik avvik;
 - summen av månedsbudsjettene er lik årsbudsjettet;
 - kontantbudsjett minus kontant er lik kontantavviket;
 - alle nødvendige Excel-filer finnes;
 - beregnede kontorader og totaler avstemmes mot fasit.
+- seksjonssummene avstemmes mot totalsynet;
+- kontantverdier ikke publiseres per seksjon når kilden mangler fordeling.
 
 Kontoer som finnes i grupperingsdefinisjonen, men ikke i tallrapporten, rapporteres som en merknad. Det stopper ikke bygget.
 

@@ -17,6 +17,7 @@ class Task2Sources:
     ledger: Path
     budget_header: Path
     budget_values: Path
+    dimension_values: Path
     dashboard_workbook: Path
     raw_transactions_workbook: Path
     account_grouping_workbook: Path
@@ -29,6 +30,7 @@ def task2_sources() -> Task2Sources:
         ledger=contract.path("common.ledger"),
         budget_header=contract.path("common.budget_header"),
         budget_values=contract.path("common.budget_values"),
+        dimension_values=contract.path("common.dimension_values"),
         dashboard_workbook=contract.path("task2.dashboard_workbook"),
         raw_transactions_workbook=contract.path("task2.raw_transactions_workbook"),
         account_grouping_workbook=contract.path("task2.account_grouping_workbook"),

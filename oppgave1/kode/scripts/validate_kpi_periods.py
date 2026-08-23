@@ -43,7 +43,7 @@ def main() -> None:
           max(budsjett_nok1000) filter (where section_code = 'all') as budsjett_total,
           sum(budsjett_nok1000) filter (where section_code <> 'all') as budsjett_seksjonssum
         from dashboard_kpi_calculated
-        where period_key = 'p1_6'
+        where period_key = '202606'
           and finansiering = '154301'
           and metric = 'ADK'
         """
@@ -65,8 +65,8 @@ def main() -> None:
         raise AssertionError("Manglende uttrekkstidspunkt skal vises eksplisitt")
     if source.periodestatus != "Ikke dokumentert i kildefilene":
         raise AssertionError("Manglende periodestatus skal vises eksplisitt")
-    if section_counts.empty or not (section_counts.antall == 27).all():
-        raise AssertionError("Kvar seksjon skal ha ni KPI-ar i tre rapportperiodar")
+    if section_counts.empty or not (section_counts.antall == 63).all():
+        raise AssertionError("Hvert kostnadssted skal ha ni KPI-er i sju rapportperioder")
     if "all" not in set(section_counts.section_code):
         raise AssertionError("Seksjonsfilteret manglar samla visning")
     close(
@@ -80,7 +80,7 @@ def main() -> None:
         "Seksjonssum mot samla ADK-budsjett",
     )
 
-    adk = rows[(rows.period_key == "p1_3") & (rows.tittel == "ADK")].iloc[0]
+    adk = rows[(rows.period_key == "202603") & (rows.tittel == "ADK")].iloc[0]
     close(float(adk.budsjett_nok1000), 22809.75, "ADK-budsjett Jan–Mar")
 
     details = json.loads(adk.grunnlag_json)
@@ -88,7 +88,7 @@ def main() -> None:
     close(detail_total, float(adk.hovedbok_nok1000), "ADK-total mot Vis grunnlag")
 
     testlab = rows[
-        (rows.period_key == "p1_3") & (rows.tittel == "Testlab prosjekt 7114")
+        (rows.period_key == "202603") & (rows.tittel == "Testlab prosjekt 7114")
     ].iloc[0]
     if not math.isnan(float(testlab.budsjett_nok1000)):
         raise AssertionError("Testlab 7114 skal ha manglende budsjett (NULL)")

@@ -22,7 +22,7 @@ from tests.fasit_support import grouped_finance_fasit_rows_frame  # noqa: E402
 
 
 CONTRACT = load_data_contract(REPO_ROOT)
-CALCULATED_PATH = CONTRACT.generated_dir("oppgave2") / "evidence" / "grouped_finance_rows.parquet"
+CALCULATED_PATH = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
 OUTPUT_PATH = CONTRACT.generated_dir("oppgave2") / "reports" / "oppgave2_kontogruppering_sammenligning.html"
 TOLERANCE = 0.00001
 
@@ -260,7 +260,7 @@ def render() -> str:
     <div class="body">
       <div class="ok" id="conclusion"></div>
       <p><b>Excel-fasit:</b> <span class="source" id="fasit"></span></p>
-      <p><b>Beregnet rapport:</b> <span class="source">ekstern generert mappe, oppgave2/evidence/grouped_finance_rows.parquet</span></p>
+      <p><b>Beregnet rapport:</b> <span class="source">ekstern generert mappe, oppgave2/static-app/grouped_finance_rows.parquet</span></p>
       <p><b>Operative hovedkilder:</b> <span class="source">data/agltransact.parquet + data/apltransact.parquet + data/apltransactvalue.parquet (2026B)</span></p>
       <div class="warning">Kontantkolonnene sammenlignes mot Excel og formelkontrolleres, men er ikke uavhengig avstemt fordi en separat operativ Parquet-kilde for kontant ennå mangler.</div>
     </div>

@@ -1,6 +1,8 @@
 # Regnskapsappene
 
-Dette er et kode-only repository for tre selvstendige Evidence-applikasjoner:
+Dette er et kode-only repository for tre selvstendige webapplikasjoner. Oppgave
+2 og 3 er statiske Vite/Svelte-apper. Oppgave 1 bruker Evidence internt og har
+en egen datafri Vite-app for offentlig publisering.
 
 | App | Formål | Lokal port |
 | --- | --- | ---: |
@@ -36,8 +38,25 @@ npm run dev:task3
 
 `build:internal` bygger alle tre apper og kontrollerer at de statiske byggene
 ikke inneholder rådata, fasit, databaser, Python/SQL-kode eller andre filer enn
-de eksplisitt tillatte resultatfilene. Dagens datasett er ikke godkjent for
-offentlig hosting. Se [`deployment-policy.json`](deployment-policy.json).
+de eksplisitt tillatte resultatfilene.
+
+## Datafrie offentlige apper
+
+```bash
+npm run build:public
+```
+
+Kommandoen bygger tre rene klientapper uten Parquet, Excel, JSON-eksporter eller
+andre rapportdata. Etter åpning velger brukeren en lokal oppgavemappe:
+
+- oppgave 1: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave1/evidence`;
+- oppgave 2: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave2/static-app`;
+- oppgave 3: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3/web`.
+
+`.github/workflows/pages.yml` bygger og publiserer alle tre under
+`/oppgave1/`, `/oppgave2/` og `/oppgave3/` når `main` oppdateres på GitHub.
+Rapportfilene leses bare i den aktuelle nettleserfanen. Se
+[`deployment-policy.json`](deployment-policy.json) og [`DATA.md`](DATA.md).
 
 ## Viktige grensesnitt
 

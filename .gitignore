@@ -1,6 +1,7 @@
 .evidence/
 .svelte-kit
 build
+pages-dist/
 node_modules
 .DS_Store
 ~$*

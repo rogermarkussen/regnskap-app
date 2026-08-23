@@ -74,21 +74,25 @@ Databygg skriver til:
 $REGNSKAP_DATA_ROOT/generated/<snapshot-id>/<oppgave>/
 ```
 
-Evidence lager en lokal, regenererbar DuckDB under appens `sources/` og et
-statisk `build/`. Begge er ignorert av versjonskontroll. Bare eksplisitt
-tillatte avledede filer kan følge med et statisk bygg.
+Hver app lager et regenererbart statisk `build/`. Oppgave 1 lager i tillegg en
+lokal DuckDB for Evidence. Oppgave 2 bygger én avledet, ZSTD-komprimert
+Parquet-fil som den statiske appen leser i nettleseren.
+Bygg og mellomfiler er ignorert av versjonskontroll. Interne bygg kan inneholde
+de avledede filene som er eksplisitt tillatt i publiseringspolicyen. Offentlige
+bygg skal ikke inneholde datafiler.
 
 ## Hosting
 
-Alle tre appene er klassifisert for intern bruk med dagens data. Oppgave 3
-krever autentisert hosting fordi den inneholder faktura-, leverandør-, bilags-
-og brukeridentifikatorer. Et offentlig bygg er sperret av
-[`deployment-policy.json`](deployment-policy.json).
+Alle tre appene kan publiseres som datafrie grensesnitt på GitHub Pages. En
+offentlig app starter tom og krever at brukeren velger den oppgavespesifikke
+mappen med genererte Parquet-filer på egen maskin. Filene leses lokalt i
+nettleserfanen, lastes ikke opp og lagres ikke i nettleseren. En ny sideåpning
+krever derfor et nytt mappevalg.
 
-En framtidig offentlig variant må enten bruke et særskilt anonymisert og
-godkjent datasett eller hente beskyttede data etter innlogging. Det holder ikke
-å skjule lenker i brukergrensesnittet, fordi filer i et statisk bygg kan lastes
-ned direkte.
+[`deployment-policy.json`](deployment-policy.json) tillater bare denne
+datafrie offentlige profilen. Produksjonskontrollen avviser Parquet-, Excel- og
+andre datafiler i et offentlig artefakt. Interne bygg med dagens data er fortsatt
+klassifisert for intern bruk, og oppgave 3 krever autentisert intern hosting.
 
 ## Sikker oppdateringsrekkefølge
 

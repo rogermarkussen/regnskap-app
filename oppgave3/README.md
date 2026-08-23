@@ -1,22 +1,21 @@
 # Oppgave 3: fakturaworkflow og månedsavslutning
 
-Oppgave 3 har to leveranser:
+Oppgave 3 har to leveranser i én statisk webapp:
 
-1. en Evidence-side for workflowstatus, koblingskvalitet og kontrollpunkter;
+1. en arbeidsflate for workflowstatus, koblingskvalitet og kontrollpunkter;
 2. månedsavslutning med hovedbok, budsjett, avvik og en utfylt Excel-mal.
 
 ## Struktur
 
 ```text
 oppgave3/
-├── components/            rapportvisninger
+├── components/            rapportvisninger i Svelte
 ├── config/                versjonerte forretningsregler
-├── pages/                 Evidence-side og spørringer
-├── scripts/               dataadapter, beregninger og validering
-├── sources/               regenererbar lokal Evidence/DuckDB-kilde
+├── src/                   appskall og felles stil
+├── scripts/               dataadapter, beregninger, eksport og validering
 ├── tests/                 fasit- og regeltester
-├── static/                regenererbare Excel-filer for intern nedlasting
-└── package.json
+├── static/                regenererbare data for interne bygg
+└── vite.config.js         statisk produksjonsbygg
 ```
 
 Operative data, mal, fasit og genererte leveranser ligger i den eksterne
@@ -32,9 +31,10 @@ dataroten. `scripts/project_data.py` er appens adapter til rotens
 - `fasit.account_grouping_*`: testorakler, aldri beregningskilder
 
 Genererte Parquet-tabeller og Excel-leveranser skrives til
-`$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3`. De to Excel-filene som
-skal tilbys internt fra nettsiden kopieres derfra til den ignorerte `static/`-
-mappen før bygg.
+`$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3`. Validerte tabeller
+eksporteres med DuckDB CLI til ignorerte JSON-filer under `static/data/` før
+Vite bygger webappen. De to Excel-filene kopieres til `static/` for intern
+nedlasting.
 
 ## Regler
 
@@ -54,8 +54,10 @@ npm run refresh:task3
 npm run build:task3
 ```
 
-Appen bruker port 3002. Et ferdig bygg er kun godkjent for autentisert, intern
-hosting med dagens data. Se [`../DATA.md`](../DATA.md).
+Appen bruker port 3002. `npm run build` lager et internt bygg med dagens data.
+`npm run build:public` lager bare HTML, CSS og JavaScript; brukeren må deretter
+velge `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3/web` lokalt. Excel-
+leveransene følger ikke det offentlige bygget. Se [`../DATA.md`](../DATA.md).
 
 Detaljert Excel-sporbarhet finnes i
 [`README-EXCEL-SPORBARHET.md`](README-EXCEL-SPORBARHET.md).

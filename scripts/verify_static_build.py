@@ -35,7 +35,7 @@ def main() -> int:
     parser.add_argument("--profile", choices=("internal", "public"), default="internal")
     args = parser.parse_args()
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))["applications"][args.application]
-    if args.profile == "public" and not policy["public_with_current_data"]:
+    if args.profile == "public" and not policy.get("public_without_data", False):
         print(
             f"Offentlig bygg er sperret for {args.application}: {policy['reason']}",
             file=sys.stderr,
@@ -46,8 +46,8 @@ def main() -> int:
     if not (build / "index.html").is_file():
         print(f"Produksjonskontroll feilet: {build / 'index.html'} finnes ikke.", file=sys.stderr)
         return 1
-    allowed_parquet = set(policy["allowed_parquet"])
-    allowed_xlsx = set(policy["allowed_xlsx"])
+    allowed_parquet = set() if args.profile == "public" else set(policy["allowed_parquet"])
+    allowed_xlsx = set() if args.profile == "public" else set(policy["allowed_xlsx"])
     findings = []
     for path in build.rglob("*"):
         if not path.is_file():
@@ -55,8 +55,13 @@ def main() -> int:
         relative = path.relative_to(build)
         lowered_parts = {part.lower() for part in relative.parts}
         suffix = path.suffix.lower()
+        public_data_file = args.profile == "public" and (
+            suffix in {".parquet", ".xlsx"}
+            or "data" in lowered_parts
+        )
         if (
-            suffix in FORBIDDEN_SUFFIXES
+            public_data_file
+            or suffix in FORBIDDEN_SUFFIXES
             or (suffix == ".parquet" and path.name not in allowed_parquet)
             or (suffix == ".xlsx" and path.name not in allowed_xlsx)
             or path.name.lower().endswith(".map")

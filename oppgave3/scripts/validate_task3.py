@@ -15,7 +15,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[1]
 RULES = load_task3_rules()
-GENERATED_DIR = task3_sources().generated_dir / "evidence"
+GENERATED_DIR = task3_sources().generated_dir / "web"
 STATUS_PATH = GENERATED_DIR / "workflow_invoice_status.parquet"
 EVENTS_PATH = GENERATED_DIR / "workflow_invoice_events.parquet"
 VALIDATION_PATH = GENERATED_DIR / "workflow_invoice_validation.parquet"

@@ -171,6 +171,9 @@ kontrollerer blant annet:
 - at kontantavvik bare beregnes når kontantgrunnlaget finnes;
 - at investeringskolonnene følger `154345`-regelen;
 - at beregnede hovedbok- og budsjettverdier stemmer mot Excel-fasiten.
+- at alle seksjoner har 16 finansierings-/periodevalg og alle 114 kontoer;
+- at seksjonssummene avstemmer mot totalsynet;
+- at kontantverdier ikke konstrueres for seksjoner når kilden mangler fordeling.
 
 Excel-filer under `Fasit/` brukes bare som testorakler. De brukes aldri til å
 fylle publiserte hovedbok- eller budsjettverdier.
@@ -180,18 +183,16 @@ fylle publiserte hovedbok- eller budsjettverdier.
 ```text
 oppgave2/
 ├── kode/                 Applikasjon, beregninger, tester og bygg
-│   ├── components/       Rapportkomponent og Excel-eksport
-│   ├── pages/            Evidence-side og dataspørring
 │   ├── scripts/          Databygging og validering
-│   ├── sources/          Evidence-kilder og DuckDB
+│   ├── src/              Statisk Svelte-app, rapportmodell og Excel-eksport
+│   ├── static/data/      Regenererbar Parquet-fil for nettleseren
 │   └── tests/            Fasit-, periode- og eksporttester
-├── data/                 Operative Parquet-filer og genererte tabeller
-├── data-fra-økonomi/     Midlertidige operative Excel-kilder
-├── Fasit/                Uavhengige Excel-testorakler
 ├── docs/                 Dokumentasjon
-├── outputs/              Genererte kontrollrapporter
 └── README.md             Kort prosjektoversikt
 ```
+
+Operative data, fasit og genererte kontrollrapporter ligger under den eksterne
+`REGNSKAP_DATA_ROOT`, ikke i repositoryet.
 
 ## Kjøring
 

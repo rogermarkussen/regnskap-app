@@ -13,7 +13,7 @@
   };
 
   const formatSourceDate = (value) => {
-    if (!value) return 'Dato manglar';
+    if (!value) return 'Dato mangler';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
     return date.toLocaleDateString('nb-NO', {
@@ -24,15 +24,13 @@
     });
   };
 
-  const periodLabelFor = (periodKey) =>
-    periodKey === 'p1_4' ? 'Januar–april' : periodKey === 'p1_6' ? 'Januar–juni' : 'Januar–mars';
-
   $: fin154301Rows = asRows(fin154301Data);
   $: fin154345Rows = asRows(fin154345Data);
   $: fin154322Rows = asRows(fin154322Data);
   $: contextRow = fin154301Rows[0] ?? fin154345Rows[0] ?? fin154322Rows[0] ?? {};
-  $: selectedSection = contextRow.section_label ?? 'Alle seksjonar';
-  $: selectedPeriod = periodLabelFor(contextRow.period_key);
+  $: selectedSection = contextRow.section_label ?? 'Alle kostnadssteder';
+  $: selectedPeriod = contextRow.period_label ?? 'Siste tilgjengelige periode';
+  $: selectedYear = contextRow.period_year ?? '';
   $: source = asRows(sourceMetadata)[0] ?? {};
 </script>
 
@@ -42,7 +40,7 @@
       <span></span><span></span><span></span>
     </div>
     <div class="hero-copy">
-      <p class="eyebrow">Finansiell styring · 2026</p>
+      <p class="eyebrow">Finansiell styring{selectedYear ? ` · ${selectedYear}` : ''}</p>
       <h1 id="dashboard-title">Økonomisk status</h1>
       <p class="hero-context">{selectedSection} · {selectedPeriod}</p>
     </div>
@@ -71,7 +69,7 @@
             <h2 id="fin-154301">Driftsutgifter</h2>
           </div>
         </div>
-        <span class="panel-count">5 KPI-ar</span>
+        <span class="panel-count">5 KPI-er</span>
       </div>
       <div class="metric-grid metric-grid-five">
         {#each fin154301Rows as row}
@@ -87,7 +85,7 @@
             <span class="panel-code">154345</span>
             <div>
               <p>Finansiering</p>
-              <h2 id="fin-154345">Utstyr og vedlikehald</h2>
+              <h2 id="fin-154345">Utstyr og vedlikehold</h2>
             </div>
           </div>
         </div>
@@ -118,9 +116,9 @@
   </main>
 
   <footer class="dashboard-footer">
-    <span>Hovudbok og budsjett 2026B</span>
-    <span>Regelversjon {contextRow.regelversjon ?? 'ikkje oppgitt'}</span>
-    <span>Datasett {source.datasett_id_kort ?? 'ikkje oppgitt'}</span>
+    <span>Hovedbok og budsjett {contextRow.budsjettversjon ?? 'ikke oppgitt'}</span>
+    <span>Regelversjon {contextRow.regelversjon ?? 'ikke oppgitt'}</span>
+    <span>Datasett {source.datasett_id_kort ?? 'ikke oppgitt'}</span>
   </footer>
 </div>
 
@@ -288,18 +286,190 @@
 
   :global(.evidence-filter-grid) {
     display: flex;
-    align-items: end;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 8px 24px;
+    gap: 12px 24px;
   }
 
-  :global(.evidence-filter-grid > div:first-child) {
-    min-width: min(420px, 100%);
+  :global(.cost-center-picker) {
+    flex: 0 1 430px;
+    min-width: min(390px, 100%);
   }
 
-  :global(.evidence-filter-grid [role="combobox"]) {
+  :global(.period-picker) {
+    flex: 0 1 360px;
+    min-width: min(340px, 100%);
+  }
+
+  :global(.cost-center-picker > .contents > div),
+  :global(.period-picker > .contents > div) {
+    display: block;
+    width: 100%;
+    margin: 0;
+  }
+
+  :global(.cost-center-picker [role="combobox"]),
+  :global(.period-picker [role="combobox"]) {
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    height: 48px;
+    padding: 0 14px 0 15px;
+    border: 1px solid #c7d8e4 !important;
+    border-left: 4px solid #2f80c2 !important;
+    border-radius: 10px;
+    color: #17324b !important;
+    background: #f3f8fb !important;
+    box-shadow: 0 2px 8px rgba(11, 31, 54, 0.06) !important;
+    font-size: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  }
+
+  :global(.cost-center-picker [role="combobox"]:hover),
+  :global(.period-picker [role="combobox"]:hover) {
+    border-color: #9fbdcf !important;
+    background: #edf6fa !important;
+  }
+
+  :global(.cost-center-picker [role="combobox"]:focus-visible),
+  :global(.period-picker [role="combobox"]:focus-visible) {
+    border-color: #2f80c2 !important;
+    outline: 3px solid rgba(47, 128, 194, 0.18) !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+  }
+
+  :global(.cost-center-picker [role="combobox"] > a[role="button"]),
+  :global(.period-picker [role="combobox"] > a[role="button"]) {
+    color: #6d879a;
+  }
+
+  :global(.cost-center-picker [role="separator"]),
+  :global(.period-picker [role="separator"]) {
+    background: #c7d8e4;
+  }
+
+  :global(.cost-center-picker [role="combobox"] > svg:last-child),
+  :global(.period-picker [role="combobox"] > svg:last-child) {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: #2f6f9f;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"])) {
+    width: min(430px, calc(100vw - 32px)) !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid #bdd0dc !important;
+    border-radius: 11px !important;
     color: #17324b !important;
     background: #ffffff !important;
+    box-shadow: 0 18px 42px rgba(11, 31, 54, 0.18) !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-root]) {
+    color: #17324b;
+    background: #ffffff;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-list]) {
+    max-height: none !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-group-items] > .viewport) {
+    height: clamp(300px, 58vh, 520px) !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-input-wrapper]) {
+    min-height: 46px;
+    border-color: #d7e3eb;
+    background: #f3f8fb;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-input]) {
+    color: #17324b;
+    font-size: 13px;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-item]) {
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: #294860;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-item][aria-selected="true"]) {
+    color: #123e63;
+    background: #e5f1f7;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-empty]) {
+    font-size: 0;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Kostnadssted"]) [data-cmdk-empty]::after) {
+    content: "Ingen kostnadssteder funnet";
+    font-size: 12px;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"])) {
+    width: min(330px, calc(100vw - 32px)) !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid #bdd0dc !important;
+    border-radius: 11px !important;
+    color: #17324b !important;
+    background: #ffffff !important;
+    box-shadow: 0 18px 42px rgba(11, 31, 54, 0.18) !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-root]) {
+    color: #17324b;
+    background: #ffffff;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-list]) {
+    max-height: none !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-group-items] > .viewport) {
+    height: min(360px, 52vh) !important;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-input-wrapper]) {
+    min-height: 46px;
+    border-color: #d7e3eb;
+    background: #f3f8fb;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-input]) {
+    color: #17324b;
+    font-size: 13px;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-item]) {
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: #294860;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-item][aria-selected="true"]) {
+    color: #123e63;
+    background: #e5f1f7;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-empty]) {
+    font-size: 0;
+  }
+
+  :global([data-melt-popover-content]:has([data-cmdk-input][placeholder="Rapportperiode"]) [data-cmdk-empty]::after) {
+    content: "Ingen rapportperioder funnet";
+    font-size: 12px;
   }
 
   .unit-block {
@@ -418,7 +588,18 @@
     .freshness { grid-column: 1 / -1; width: auto; }
     .filter-band { align-items: stretch; flex-direction: column; border-radius: 0; }
     :global(.evidence-filter-grid) { align-items: stretch; flex-direction: column; }
-    :global(.evidence-filter-grid > div:first-child) { min-width: 0; width: 100%; }
+    :global(.cost-center-picker),
+    :global(.period-picker) { flex-basis: auto; min-width: 0; width: 100%; }
+    :global(.period-picker [role="combobox"]) {
+      padding-right: 10px;
+      padding-left: 10px;
+      font-size: 11px;
+    }
+    :global(.period-picker [role="separator"]) {
+      margin-right: 6px;
+      margin-left: 6px;
+    }
+    :global(.period-picker [role="combobox"] > svg:last-child) { margin-left: 4px; }
     .unit-block { padding: 10px 0 0; border-top: 1px solid #dce5ec; border-left: 0; text-align: left; }
     .dashboard-content { padding: 0 12px; }
     .metric-grid-five,

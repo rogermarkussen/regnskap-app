@@ -89,8 +89,8 @@ test('nettleserberegningen gjenskaper alle KPI-radene fra operative Parquet-data
   });
   const calculatedByKey = new Map(calculatedRows.map((row) => [rowKey(row), row]));
 
-  assert.equal(calculatedRows.length, 27);
-  assert.equal(expectedRows.length, 27);
+  assert.equal(calculatedRows.length, 63);
+  assert.equal(expectedRows.length, 63);
 
   for (const expected of expectedRows) {
     const key = rowKey(expected);
@@ -125,15 +125,15 @@ test('opplastingsflyten godtar både tre råfiler og én beregnet KPI-fil', asyn
     loadDashboardRowsFromParquetFiles([calculatedFile])
   ]);
 
-  assert.equal(rawResult.length, 27);
-  assert.equal(calculatedResult.length, 27);
+  assert.equal(rawResult.length, 63);
+  assert.equal(calculatedResult.length, 63);
   assert.deepEqual(
     new Set(rawResult.map((row) => row.period_key)),
-    new Set(['p1_3', 'p1_4', 'p1_6'])
+    new Set(['202601', '202602', '202603', '202604', '202605', '202606', '202607'])
   );
   assert.deepEqual(
     new Set(calculatedResult.map((row) => row.period_key)),
-    new Set(['p1_3', 'p1_4', 'p1_6'])
+    new Set(['202601', '202602', '202603', '202604', '202605', '202606', '202607'])
   );
 });
 
@@ -150,7 +150,7 @@ test('de syntetiske Parquet-testfilene kan lastes gjennom samme flyt som nettles
   ].map((filename) => browserFile(`../testdata-opplasting/parquet/beregnet/${filename}`)));
 
   const rawResult = await loadOperationalParquetFiles(rawFiles);
-  assert.equal(rawResult.length, 27);
+  assert.equal(rawResult.length, 63);
   for (const calculatedFile of calculatedFiles) {
     const calculatedResult = await loadCalculatedParquetFile([calculatedFile]);
     assert.equal(calculatedResult.length, 27, calculatedFile.name);

@@ -1,90 +1,194 @@
 <script>
   export let summary = [];
   export let invoices = [];
+  export let validations = [];
+  export let showDownload = true;
 
   let section = '711';
   let financing = '154301';
+  let showNkom = false;
 
-  const number = (value) =>
-    value === null || value === undefined
-      ? '–'
-      : Number(value / 1000).toLocaleString('nb-NO', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 1
-        });
+  const money = (value, signed = false) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '–';
+    const amount = Number(value) / 1000;
+    return amount.toLocaleString('nb-NO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+      signDisplay: signed ? 'exceptZero' : 'auto'
+    });
+  };
 
   const periodLabel = (period) => {
     const value = String(period ?? '');
-    if (value.length !== 6) return value || '–';
+    if (value.length !== 6) return value || 'Ukjent periode';
     const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, 1);
     return date.toLocaleDateString('nb-NO', { month: 'long', year: 'numeric' });
   };
 
+  const diffClass = (value) => Number(value) < 0 ? 'negative' : Number(value) > 0 ? 'positive' : '';
+
   $: period = summary[0]?.periode;
   $: downloadPeriod = String(period ?? '').replace(/^(\d{4})(\d{2})$/, '$1-$2');
-  $: downloadHref = downloadPeriod
-    ? `/manedsavslutning_${downloadPeriod}.xlsx?v=${period}-cash712`
-    : '/manedsavslutning-siste.xlsx';
-  $: sections = [...new Set(summary.filter((row) => row.omfang === 'Seksjon').map((row) => row.omfang_id))].sort();
-  $: sectionRows = summary.filter((row) => row.omfang === 'Seksjon' && row.omfang_id === section);
-  $: financings = [...new Set(sectionRows.map((row) => row.finansiering))].sort();
-  $: if (financings.length && !financings.includes(financing)) financing = financings[0];
-  $: selectedRows = sectionRows.filter((row) => row.finansiering === financing);
+  $: downloadHref = downloadPeriod ? `/manedsavslutning_${downloadPeriod}.xlsx` : '/manedsavslutning-siste.xlsx';
+  $: sections = [...new Set(summary.filter((row) => row.omfang === 'Seksjon').map((row) => String(row.omfang_id)))].sort();
+  $: if (sections.length && !sections.includes(section)) section = sections[0];
+  $: sectionRows = summary.filter((row) => row.omfang === 'Seksjon' && String(row.omfang_id) === section);
+  $: financings = [...new Set(sectionRows.map((row) => String(row.finansiering)))].sort((a, b) => a.localeCompare(b, 'nb-NO'));
+  $: if (financings.length && !financings.includes(financing)) financing = financings.includes('154301') ? '154301' : financings[0];
+  $: selectedRows = sectionRows.filter((row) => String(row.finansiering) === financing);
   $: nkomRows = summary.filter((row) => row.omfang === 'Nkom' && row.kategori === 'Driftskostnader');
-  $: sectionInvoices = invoices.filter((row) => row.seksjon === section);
+  $: sectionInvoices = invoices.filter((row) => String(row.seksjon) === section);
+  $: warningChecks = validations.filter((row) => row.status !== 'ok');
+  $: totalRow = selectedRows.find((row) => row.kategori === 'Driftskostnader');
 </script>
 
-<section class="close-shell">
-  <div class="heading">
+<div class="report-shell">
+  <header class="page-heading">
     <div>
-      <span class="kicker">Månedsavslutning · {periodLabel(period)}</span>
-      <h2>Hovedbok, budsjett og kandidater til fakturakontroll</h2>
-      <p>Siste tilgjengelige periode velges automatisk. Beløp vises i NOK 1 000. Diff = budsjett − hovedbok.</p>
+      <span class="eyebrow">Månedsavslutning · {periodLabel(period)}</span>
+      <h1>Kontroller perioden før den lukkes</h1>
+      <p>Sammenlign hovedbok og budsjett, undersøk avvik og følg opp fakturaer som kan mangle bokføring.</p>
     </div>
-    <a class="download" href={downloadHref} download>Last ned utfylt Excel-mal</a>
-  </div>
+    {#if showDownload}
+      <a class="download" href={downloadHref} download>
+        <span aria-hidden="true">↓</span>
+        <span><strong>Last ned Excel</strong><small>Utfylt mal for {downloadPeriod || 'siste periode'}</small></span>
+      </a>
+    {/if}
+  </header>
 
-  <div class="filters">
-    <label><span>Seksjon</span><select bind:value={section}>{#each sections as value}<option value={value}>{value}</option>{/each}</select></label>
-    <label><span>Finansiering</span><select bind:value={financing}>{#each financings as value}<option value={value}>{value}</option>{/each}</select></label>
-  </div>
+  <section class="control-rail" aria-label="Kontrollstatus">
+    <div class="rail-title"><span>Kontrollbilde</span><strong>{warningChecks.length ? `${warningChecks.length} punkt må avklares` : 'Ingen varslede kontrollpunkt'}</strong></div>
+    <div class="rail-items">
+      <article>
+        <span class="rail-marker period" aria-hidden="true"></span>
+        <div><small>Aktuell periode</small><strong>{periodLabel(period)}</strong></div>
+      </article>
+      <article class:attention={invoices.length > 0}>
+        <span class="rail-marker" aria-hidden="true"></span>
+        <div><small>Fakturakandidater</small><strong>{invoices.length} til kontroll</strong></div>
+      </article>
+      <article class:attention={warningChecks.length > 0}>
+        <span class="rail-marker" aria-hidden="true"></span>
+        <div><small>Faglige avklaringer</small><strong>{warningChecks.length} åpne punkt</strong></div>
+      </article>
+      <article>
+        <span class="rail-marker complete" aria-hidden="true"></span>
+        <div><small>Dekning</small><strong>{sections.length} seksjoner</strong></div>
+      </article>
+    </div>
+  </section>
 
-  <div class="table-scroll">
-    <table>
-      <thead><tr><th>Kategori</th><th>Hovedbok måned</th><th>Budsjett måned</th><th>Diff</th><th>Hovedbok hittil</th><th>Budsjett hittil</th><th>Diff hittil</th></tr></thead>
-      <tbody>
-        {#each selectedRows as row}
-          <tr class:total={row.kategori === 'Driftskostnader'}>
-            <th>{row.kategori}</th>
-            <td>{number(row.hovedbok_maaned_nok)}</td><td>{number(row.budsjett_maaned_nok)}</td><td>{number(row.avvik_maaned_nok)}</td>
-            <td>{number(row.hovedbok_hittil_nok)}</td><td>{number(row.budsjett_hittil_nok)}</td><td>{number(row.avvik_hittil_nok)}</td>
-          </tr>
+  {#if warningChecks.length}
+    <details class="notice">
+      <summary><span class="notice-icon" aria-hidden="true">i</span><span><strong>Foreløpig faglig grunnlag</strong><small>Åpne for å se kontrollpunktene som ikke er endelig godkjent.</small></span><b>Vis {warningChecks.length}</b></summary>
+      <div class="notice-list">
+        {#each warningChecks as check}
+          <div><strong>{check.kontroll}</strong><span>{check.detalj}</span><b>{check.antall}</b></div>
         {/each}
-      </tbody>
-    </table>
-  </div>
+      </div>
+    </details>
+  {/if}
 
-  <div class="subheading"><h3>Total Nkom per finansiering</h3><span>Driftskostnader</span></div>
-  <div class="table-scroll">
-    <table>
-      <thead><tr><th>Finansiering</th><th>Hovedbok måned</th><th>Budsjett måned</th><th>Diff</th><th>Hovedbok hittil</th><th>Budsjett hittil</th><th>Diff hittil</th></tr></thead>
-      <tbody>{#each nkomRows as row}<tr><th>{row.finansiering}</th><td>{number(row.hovedbok_maaned_nok)}</td><td>{number(row.budsjett_maaned_nok)}</td><td>{number(row.avvik_maaned_nok)}</td><td>{number(row.hovedbok_hittil_nok)}</td><td>{number(row.budsjett_hittil_nok)}</td><td>{number(row.avvik_hittil_nok)}</td></tr>{/each}</tbody>
-    </table>
-  </div>
+  <section class="workspace">
+    <div class="workspace-heading">
+      <div><span class="eyebrow">Resultat mot budsjett</span><h2>Seksjonsoversikt</h2></div>
+      <p>Beløp i NOK 1 000. Avvik er budsjett minus hovedbok.</p>
+    </div>
 
-  <div class="subheading"><h3>Kandidater til fakturakontroll for seksjon {section}</h3><span>{sectionInvoices.length} rader</span></div>
-  {#if sectionInvoices.length}
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th>Faktura</th><th>Leverandør</th><th>Status</th><th>Konto</th><th>Prosjekt</th><th>Finansiering</th><th>Beløp</th><th>Alder</th></tr></thead>
-        <tbody>{#each sectionInvoices as row}<tr><th>{row.fakturanr}</th><td>{row.leverandor_navn}</td><td title={row.statusgrunnlag}>{row.maanedsavslutningsstatus}</td><td>{row.konto}</td><td>{row.prosjektnr}</td><td>{row.finansiering}</td><td>{number(row.belop_nok)}</td><td>{row.alder_dager} dager</td></tr>{/each}</tbody>
+    <div class="section-tabs" role="group" aria-label="Velg seksjon">
+      {#each sections as value}
+        <button type="button" class:active={section === value} on:click={() => (section = value)} aria-pressed={section === value}>
+          <span>Seksjon</span><strong>{value}</strong>
+          {#if invoices.some((invoice) => String(invoice.seksjon) === value)}<b>{invoices.filter((invoice) => String(invoice.seksjon) === value).length}</b>{/if}
+        </button>
+      {/each}
+    </div>
+
+    <div class="table-controls">
+      <label><span>Finansiering</span><select bind:value={financing}>{#each financings as value}<option value={value}>{value}</option>{/each}</select></label>
+      {#if totalRow}
+        <div class="selected-total"><span>Driftskostnader denne måneden</span><strong class="tabular">{money(totalRow.hovedbok_maaned_nok)}</strong></div>
+        <div class="selected-total"><span>Avvik denne måneden</span><strong class="tabular {diffClass(totalRow.avvik_maaned_nok)}">{money(totalRow.avvik_maaned_nok, true)}</strong></div>
+      {/if}
+    </div>
+
+    <div class="finance-table-scroll">
+      <table class="finance-table">
+        <thead>
+          <tr class="group-row"><th rowspan="2">Kategori</th><th colspan="3">Denne måneden</th><th colspan="3">Hittil i år</th></tr>
+          <tr><th>Hovedbok</th><th>Budsjett</th><th>Avvik</th><th>Hovedbok</th><th>Budsjett</th><th>Avvik</th></tr>
+        </thead>
+        <tbody>
+          {#each selectedRows as row}
+            <tr class:total={row.kategori === 'Driftskostnader'}>
+              <th>{row.kategori}</th>
+              <td>{money(row.hovedbok_maaned_nok)}</td>
+              <td>{money(row.budsjett_maaned_nok)}</td>
+              <td class={diffClass(row.avvik_maaned_nok)}>{money(row.avvik_maaned_nok, true)}</td>
+              <td>{money(row.hovedbok_hittil_nok)}</td>
+              <td>{money(row.budsjett_hittil_nok)}</td>
+              <td class={diffClass(row.avvik_hittil_nok)}>{money(row.avvik_hittil_nok, true)}</td>
+            </tr>
+          {:else}
+            <tr><td colspan="7" class="empty-cell">Ingen tall for valgt kombinasjon.</td></tr>
+          {/each}
+        </tbody>
       </table>
     </div>
-  {:else}
-    <p class="empty">Ingen kontrollkandidater som både mangler bokføringstreff, har en ACT-oppgave og siste fullførte handling ATTEST eller BDMGOD for denne seksjonen.</p>
-  {/if}
-</section>
+
+    <button class="nkom-toggle" type="button" on:click={() => (showNkom = !showNkom)} aria-expanded={showNkom}>
+      <span><strong>Nkom samlet per finansiering</strong><small>Driftskostnader for hele virksomheten</small></span><b>{showNkom ? 'Skjul' : 'Vis oversikt'} <i aria-hidden="true">⌄</i></b>
+    </button>
+    {#if showNkom}
+      <div class="finance-table-scroll nkom-table">
+        <table class="finance-table">
+          <thead><tr><th>Finansiering</th><th>Hovedbok måned</th><th>Budsjett måned</th><th>Avvik måned</th><th>Hovedbok hittil</th><th>Budsjett hittil</th><th>Avvik hittil</th></tr></thead>
+          <tbody>{#each nkomRows as row}<tr><th>{row.finansiering}</th><td>{money(row.hovedbok_maaned_nok)}</td><td>{money(row.budsjett_maaned_nok)}</td><td class={diffClass(row.avvik_maaned_nok)}>{money(row.avvik_maaned_nok, true)}</td><td>{money(row.hovedbok_hittil_nok)}</td><td>{money(row.budsjett_hittil_nok)}</td><td class={diffClass(row.avvik_hittil_nok)}>{money(row.avvik_hittil_nok, true)}</td></tr>{/each}</tbody>
+        </table>
+      </div>
+    {/if}
+  </section>
+
+  <section class="workspace invoice-workspace">
+    <div class="workspace-heading">
+      <div><span class="eyebrow">Arbeidsliste</span><h2>Fakturaer til kontroll i seksjon {section}</h2></div>
+      <span class:has-items={sectionInvoices.length > 0} class="count-pill">{sectionInvoices.length} fakturaer</span>
+    </div>
+
+    {#if sectionInvoices.length}
+      <div class="invoice-list">
+        {#each sectionInvoices as row}
+          <article>
+            <div class="invoice-id"><span>Faktura</span><strong>{row.fakturanr}</strong><small>{row.leverandor_navn || 'Ukjent leverandør'}</small></div>
+            <dl>
+              <div><dt>Status</dt><dd><span class="status-badge">{row.maanedsavslutningsstatus}</span></dd></div>
+              <div><dt>Konto / prosjekt</dt><dd>{row.konto || '–'} / {row.prosjektnr || '–'}</dd></div>
+              <div><dt>Finansiering</dt><dd>{row.finansiering || '–'}</dd></div>
+              <div><dt>Beløp</dt><dd class="tabular">{money(row.belop_nok)}</dd></div>
+              <div><dt>Alder</dt><dd class:old={Number(row.alder_dager) > 31}>{row.alder_dager} dager</dd></div>
+            </dl>
+            <p>{row.statusgrunnlag}</p>
+          </article>
+        {/each}
+      </div>
+    {:else}
+      <div class="empty-state"><span aria-hidden="true">✓</span><div><strong>Ingen fakturaer i arbeidslisten</strong><p>Ingen fakturaer oppfyller kontrollregelen for seksjon {section} i dette snapshotet.</p></div></div>
+    {/if}
+  </section>
+</div>
 
 <style>
-  .close-shell{margin-top:20px;padding:20px;background:white;border:1px solid #dce3e9;border-radius:12px;color:#172433}.heading,.subheading{display:flex;align-items:center;justify-content:space-between;gap:18px}.heading h2{margin:3px 0!important;font-size:21px}.heading p{margin:0;color:#687786;font-size:11px}.kicker{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#317e7a}.download{padding:10px 13px;border-radius:8px;background:#285c78;color:white;text-decoration:none;font-size:11px;font-weight:750}.filters{display:flex;gap:10px;margin:16px 0}.filters label{display:grid;gap:4px}.filters span{font-size:9px;font-weight:750;color:#657485}.filters select{min-width:170px;height:36px;border:1px solid #ccd6e0;border-radius:7px;background:white;padding:0 9px}.table-scroll{overflow:auto;border:1px solid #e1e7ec;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{padding:8px 9px;border-bottom:1px solid #e8edf1;text-align:right;white-space:nowrap}th:first-child{text-align:left}thead th{background:#edf2f6;color:#445467;text-transform:uppercase;font-size:8px}.total th,.total td{background:#edf6f4;font-weight:800}.subheading{margin:20px 0 8px}.subheading h3{margin:0!important;font-size:15px}.subheading span{font-size:10px;color:#718091}.empty{margin:0;padding:12px;background:#f7f9fb;color:#697887;font-size:11px;border-radius:7px}@media(max-width:850px){.heading{align-items:flex-start;flex-direction:column}.filters{flex-direction:column}.filters select{width:100%}}
+  .report-shell{max-width:1480px;margin:0 auto;color:var(--ink)}
+  .page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:30px;margin-bottom:28px}.eyebrow{display:block;margin-bottom:7px;color:var(--teal-700);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.14em}.page-heading h1{max-width:720px;margin:0 0 8px;font-family:"Aptos Display","Segoe UI Variable Display",sans-serif;font-size:clamp(30px,3vw,44px);line-height:1.08;letter-spacing:-.035em}.page-heading p{max-width:760px;margin:0;color:var(--muted);font-size:13px;line-height:1.55}.download{display:flex;align-items:center;gap:11px;min-width:205px;padding:11px 13px;border:1px solid #0f6662;border-radius:8px;background:var(--teal-700);color:white;text-decoration:none;box-shadow:0 7px 18px rgba(20,116,111,.18)}.download>span:first-child{display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(255,255,255,.35);border-radius:5px;font-size:18px}.download>span:last-child{display:grid;gap:2px}.download strong{font-size:11px}.download small{color:#bfe3df;font-size:8px}
+  .control-rail{display:grid;grid-template-columns:190px 1fr;margin-bottom:16px;background:var(--navy-900);color:white;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(20,40,59,.09)}.rail-title{display:grid;align-content:center;gap:5px;padding:18px 20px;background:var(--navy-950);border-right:1px solid #294256}.rail-title span{color:#86a0b3;font-size:9px;text-transform:uppercase;letter-spacing:.13em}.rail-title strong{font-size:11px;line-height:1.35}.rail-items{display:grid;grid-template-columns:repeat(4,1fr)}.rail-items article{position:relative;display:flex;align-items:center;gap:11px;min-height:75px;padding:14px 16px;border-right:1px solid #2c4559}.rail-items article:last-child{border:0}.rail-marker{width:8px;height:28px;background:#5f7b8f;border-radius:2px}.rail-marker.period,.rail-marker.complete{background:#63bdb7}.rail-items article.attention .rail-marker{background:#e09a4f}.rail-items div{display:grid;gap:4px}.rail-items small{color:#91a6b5;font-size:8px}.rail-items strong{font-size:11px}
+  .notice{margin-bottom:16px;border:1px solid #e8cda4;border-radius:9px;background:#fffaf2;overflow:hidden}.notice summary{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;padding:12px 15px;cursor:pointer;list-style:none}.notice summary::-webkit-details-marker{display:none}.notice-icon{display:grid;place-items:center;width:25px;height:25px;border:1px solid #d5a967;border-radius:50%;color:var(--amber);font-family:Georgia,serif;font-weight:700}.notice summary>span:nth-child(2){display:grid;gap:2px}.notice summary strong{font-size:10px}.notice summary small{color:#806c52;font-size:9px}.notice summary b{color:var(--amber);font-size:9px}.notice-list{display:grid;border-top:1px solid #ecd8b9;background:white}.notice-list div{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(300px,2fr) 45px;gap:15px;align-items:start;padding:10px 15px;border-bottom:1px solid #eee4d6;font-size:9px}.notice-list div:last-child{border:0}.notice-list span{color:var(--muted);line-height:1.45}.notice-list b{text-align:right;color:var(--amber)}
+  .workspace{margin-top:16px;padding:22px;background:var(--paper);border:1px solid var(--line);border-radius:11px}.workspace-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}.workspace-heading h2{margin:0;font-family:"Aptos Display","Segoe UI Variable Display",sans-serif;font-size:22px;letter-spacing:-.02em}.workspace-heading p{margin:0 0 2px;color:var(--muted);font-size:9px}.section-tabs{display:grid;grid-template-columns:repeat(5,minmax(100px,1fr));gap:7px;margin:20px 0 16px;padding:5px;background:#edf2f4;border-radius:9px}.section-tabs button{position:relative;display:grid;gap:3px;padding:10px 13px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);text-align:left;cursor:pointer}.section-tabs button:hover{background:#f8fafb}.section-tabs button.active{border-color:var(--line-strong);background:white;color:var(--ink);box-shadow:0 2px 7px rgba(24,45,62,.07)}.section-tabs span{font-size:8px;text-transform:uppercase;letter-spacing:.1em}.section-tabs strong{font-size:13px}.section-tabs b{position:absolute;top:11px;right:10px;min-width:19px;padding:2px 5px;border-radius:99px;background:var(--amber-soft);color:var(--amber);font-size:8px;text-align:center}
+  .table-controls{display:flex;align-items:end;gap:24px;margin-bottom:12px}.table-controls label{display:grid;gap:5px;min-width:210px}.table-controls label span,.selected-total span{color:var(--muted);font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em}.table-controls select{height:36px;padding:0 32px 0 10px;border:1px solid var(--line-strong);border-radius:6px;background:white;color:var(--ink);font-size:10px}.selected-total{display:grid;gap:4px;margin-left:auto;text-align:right}.selected-total+.selected-total{margin-left:0;padding-left:24px;border-left:1px solid var(--line)}.selected-total strong{font-size:15px}.positive{color:var(--green)!important}.negative{color:var(--red)!important}
+  .finance-table-scroll{overflow:auto;border:1px solid var(--line);border-radius:7px}.finance-table{width:100%;border-collapse:collapse;font-size:10px;font-variant-numeric:tabular-nums}.finance-table th,.finance-table td{padding:11px 13px;border-bottom:1px solid #e7edf0;text-align:right;white-space:nowrap}.finance-table th:first-child{text-align:left}.finance-table thead th{background:#f2f6f7;color:#536777;font-size:8px;text-transform:uppercase;letter-spacing:.04em}.finance-table thead .group-row th{background:#e8eff2;color:#314c61;border-bottom:1px solid #d5e0e5}.finance-table thead .group-row th+th{border-left:1px solid #d3dfe5}.finance-table tbody th{font-weight:650}.finance-table tbody tr:last-child th,.finance-table tbody tr:last-child td{border-bottom:0}.finance-table tr.total th,.finance-table tr.total td{background:#e8f4f1;font-weight:800;border-top:2px solid #80bcb5}.empty-cell{text-align:center!important;color:var(--muted)!important;padding:28px!important}
+  .nkom-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:13px;padding:11px 13px;border:1px solid var(--line);border-radius:7px;background:#f8fafb;text-align:left;cursor:pointer}.nkom-toggle>span{display:grid;gap:3px}.nkom-toggle strong{font-size:10px}.nkom-toggle small{color:var(--muted);font-size:8px}.nkom-toggle b{color:var(--teal-700);font-size:9px}.nkom-toggle i{display:inline-block;margin-left:5px;font-style:normal}.nkom-table{margin-top:8px}
+  .invoice-workspace{margin-top:20px}.count-pill{padding:5px 9px;border-radius:99px;background:#edf2f4;color:var(--muted);font-size:9px;font-weight:700}.count-pill.has-items{background:var(--amber-soft);color:var(--amber)}.invoice-list{display:grid;gap:8px;margin-top:16px}.invoice-list article{display:grid;grid-template-columns:minmax(160px,.7fr) minmax(480px,2fr);gap:12px 28px;padding:15px;border:1px solid var(--line);border-left:3px solid #d18a3e;border-radius:7px}.invoice-id{display:grid;align-content:start;gap:3px}.invoice-id>span{color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}.invoice-id>strong{font-family:"Cascadia Mono","SFMono-Regular",Consolas,monospace;font-size:13px}.invoice-id>small{color:var(--muted);font-size:9px}.invoice-list dl{display:grid;grid-template-columns:1.3fr repeat(4,1fr);gap:16px;margin:0}.invoice-list dl div{display:grid;align-content:start;gap:5px}.invoice-list dt{color:var(--quiet);font-size:8px}.invoice-list dd{margin:0;font-size:9px;font-weight:650}.status-badge{display:inline-block;padding:4px 6px;border-radius:4px;background:var(--amber-soft);color:var(--amber);font-size:8px}.old{color:var(--red)}.invoice-list article>p{grid-column:1/-1;margin:0;padding-top:9px;border-top:1px solid #edf1f3;color:var(--muted);font-size:8px;line-height:1.4}.empty-state{display:flex;align-items:center;gap:13px;margin-top:16px;padding:21px;background:#f4f8f7;border:1px solid #d6e7e2;border-radius:7px}.empty-state>span{display:grid;place-items:center;width:31px;height:31px;border-radius:50%;background:var(--green-soft);color:var(--green);font-weight:800}.empty-state div{display:grid;gap:3px}.empty-state strong{font-size:10px}.empty-state p{margin:0;color:var(--muted);font-size:9px}
+  @media(max-width:1150px){.control-rail{grid-template-columns:1fr}.rail-title{border:0;border-bottom:1px solid #294256}.invoice-list article{grid-template-columns:1fr}.invoice-list dl{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:760px){.page-heading{align-items:stretch;flex-direction:column}.download{width:max-content}.control-rail{display:block}.rail-items{grid-template-columns:1fr 1fr}.rail-items article{border-bottom:1px solid #2c4559}.notice-list div{grid-template-columns:1fr}.notice-list b{text-align:left}.workspace{padding:16px}.workspace-heading{align-items:flex-start;flex-direction:column}.section-tabs{display:flex;overflow:auto}.section-tabs button{min-width:95px}.table-controls{align-items:stretch;flex-direction:column;gap:10px}.table-controls label{min-width:0}.selected-total{margin-left:0;text-align:left}.selected-total+.selected-total{padding:0;border:0}.invoice-list dl{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.page-heading h1{font-size:30px}.rail-items{grid-template-columns:1fr}.invoice-list dl{grid-template-columns:1fr}.download{width:100%}}
 </style>

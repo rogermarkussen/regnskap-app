@@ -4,7 +4,7 @@
 > nedenfor beskriver innholdet, mens `data-manifest.json` er autoritativ for
 > faktisk sti, klassifisering og kontrollsum.
 
-**Sist oppdatert:** 30. juli 2026
+**Sist oppdatert:** 23. august 2026
 
 ## Prinsipp
 
@@ -26,8 +26,10 @@ Parquet og sammenligner deretter hver relevant Excel-celle med resultatet.
 | Fasit for kontogruppering `154301` | `Fasit/Kontogruppering med tall 18.06.26 (finansiering 154301).xlsx` | Visuell og automatisk konto-/totalkontroll |
 | Fasit for kontogruppering `alle` | `Fasit/Kontogruppering med tall 18.06.26 (finansiering ALLE).xlsx` | Visuell og automatisk konto-/totalkontroll |
 
-Den publiserte kontogrupperingen leser de eksternt genererte datasettene
-`grouped_finance_rows.parquet` og `grouped_finance_validation.parquet`.
+Den publiserte kontogrupperingen leser den eksternt genererte og
+ZSTD-komprimerte filen `task2-report.parquet`. Valideringen leser
+`grouped_finance_rows.parquet`, `section_grouped_finance_rows.parquet` og
+`grouped_finance_validation.parquet` utenfor det statiske bygget.
 Normalisert fasit produseres ikke som en produksjonstabell. Den finnes bare i
 testminnet gjennom `kode/tests/fasit_support.py`.
 
@@ -42,6 +44,7 @@ Kartleggingen av de operative Parquet-filene viser følgende:
 | Kontantregnskap | Ingen egen Parquet-tabell eller felt som gir samme kontantverdier som Excel-rapporten | Må fortsatt hentes fra operativ Excel-kilde eller en ny kontantkilde |
 | Investeringsregnskap | `agltransact.parquet`, filtrert på `dim_4 = 154345` | Godkjent investeringsregel |
 | Investeringsbudsjett | `2026B` fra `apltransact*.parquet`, filtrert på `dim_1 = 212` | Godkjent investeringsregel |
+| Seksjon/kostnadssted | `dim_1` i hovedbok og budsjett, navn fra dimensjonsregisterets `attribute_id = C1` | Kan filtreres fra operative Parquet-kilder |
 
 Hovedboksfilen inneholder perioder fra `202601` til `202607`, mens
 budsjettverdiene for `2026B` dekker `202601` til `202612`. Nyeste periode i
@@ -53,6 +56,10 @@ kontosammenligning for finansiering `154301` viser at Parquet reproduserer
 hovedbokskolonnen i Excel, mens kontantkolonnen har et annet
 periodiseringsgrunnlag. Dette gjelder blant annet lønn, feriepenger,
 avskrivninger og konsulentkostnader.
+
+Kontantkilden har ikke en pålitelig seksjonsfordeling. Når brukeren velger en
+seksjon, viser appen derfor kontantfeltene som manglende. Den fordeler ikke
+totalverdier og fyller ikke inn null.
 
 ## Beregningsfunksjoner
 

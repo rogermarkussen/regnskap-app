@@ -17,7 +17,7 @@ class Task2GroupingFasitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         calculated_path = (
-            CONTRACT.generated_dir("oppgave2") / "evidence" / "grouped_finance_rows.parquet"
+            CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
         )
         connection = duckdb.connect()
         try:

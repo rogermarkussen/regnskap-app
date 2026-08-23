@@ -27,7 +27,7 @@ FASIT_154301_PATH = CONTRACT.path("fasit.account_grouping_154301")
 LEDGER_PATH = CONTRACT.path("common.ledger")
 BUDGET_HEADER_PATH = CONTRACT.path("common.budget_header")
 BUDGET_VALUE_PATH = CONTRACT.path("common.budget_values")
-PUBLISHED_SUMMARY_PATH = CONTRACT.generated_dir("oppgave3") / "evidence" / "monthly_close_summary.parquet"
+PUBLISHED_SUMMARY_PATH = CONTRACT.generated_dir("oppgave3") / "web" / "monthly_close_summary.parquet"
 FASIT_PERIOD = "202603"
 TOLERANCE_NOK = 0.02
 

@@ -1,0 +1,5 @@
+:root { font-family: Inter, Aptos, "Segoe UI", system-ui, sans-serif; color: #14263a; background: #eaf1f6; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+html, body, #app { min-width: 320px; min-height: 100%; margin: 0; }
+body { background: #eaf1f6; }
+button, input, select { font: inherit; }

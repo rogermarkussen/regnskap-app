@@ -41,13 +41,22 @@ class SectionScope:
     sort_order: int
 
 
-PERIODS = {
-    "p1_3": "202603",
-    "p1_4": "202604",
-    "p1_6": "202606",
-}
-
 BUSINESS_RULE_VERSION = "2026-08-06"
+
+MONTH_NAMES = (
+    "Januar",
+    "Februar",
+    "Mars",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -83,7 +92,8 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               count(*) as antall_rader,
               count(*) filter (where try_cast(amount as double) is null) as ugyldige_belop
             from read_parquet('{actual_path.as_posix()}')
-            where trim(period) like '2026%'
+            where regexp_matches(trim(period), '^[0-9]{{6}}$')
+              and try_cast(substr(trim(period), 5, 2) as integer) between 1 and 12
             """
         ).fetchone()
         budget = connection.execute(
@@ -95,7 +105,9 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               count(*) filter (where try_cast(v.amount as double) is null) as ugyldige_belop
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = '2026B'
+            where h.version = substr(trim(v.period), 1, 4) || 'B'
+              and regexp_matches(trim(v.period), '^[0-9]{{6}}$')
+              and try_cast(substr(trim(v.period), 5, 2) as integer) between 1 and 12
             """
         ).fetchone()
     finally:
@@ -104,7 +116,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
     if not actual[3] or actual[4]:
         raise ValueError("Hovedbokskilden er tom eller har ugyldige beløp")
     if not budget[2] or budget[3]:
-        raise ValueError("Budsjettkilden 2026B er tom eller har ugyldige beløp")
+        raise ValueError("Budsjettkilden er tom eller har ugyldige beløp")
 
     source_hashes = [_file_sha256(path) for path in source_paths]
     combined = hashlib.sha256("|".join(source_hashes).encode("ascii")).hexdigest()
@@ -125,7 +137,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
                 "hovedbok_siste_transaksjonsdato": actual[2],
                 "hovedbok_rader": actual[3],
                 "budsjett_kilde": f"{budget_header_path.name} + {budget_value_path.name}",
-                "budsjettversjon": "2026B",
+                "budsjettversjon": "Opprinnelig budsjett per år",
                 "budsjett_periode_fra": budget[0],
                 "budsjett_periode_til": budget[1],
                 "budsjett_rader": budget[2],
@@ -211,10 +223,12 @@ def _read_sources(
                 when dim_1 is null or trim(cast(dim_1 as varchar)) = '' then '__missing__'
                 else trim(cast(dim_1 as varchar))
               end as section_code,
-              cast(period as varchar) as period,
+              trim(cast(period as varchar)) as period,
               try_cast(amount as double) / 1000.0 as amount_tusen
             from read_parquet('{actual_path.as_posix()}')
-            where period between '202601' and '202606'
+            where regexp_matches(trim(cast(period as varchar)), '^[0-9]{{6}}$')
+              and try_cast(substr(trim(cast(period as varchar)), 5, 2) as integer)
+                  between 1 and 12
             """
         ).fetchdf()
         budget = connection.execute(
@@ -227,12 +241,15 @@ def _read_sources(
                 when h.dim_1 is null or trim(cast(h.dim_1 as varchar)) = '' then '__missing__'
                 else trim(cast(h.dim_1 as varchar))
               end as section_code,
-              cast(v.period as varchar) as period,
+              trim(cast(v.period as varchar)) as period,
+              cast(h.version as varchar) as budget_version,
               try_cast(v.amount as double) / 1000.0 as amount_tusen
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = '2026B'
-              and v.period between '202601' and '202606'
+            where h.version = substr(trim(cast(v.period as varchar)), 1, 4) || 'B'
+              and regexp_matches(trim(cast(v.period as varchar)), '^[0-9]{{6}}$')
+              and try_cast(substr(trim(cast(v.period as varchar)), 5, 2) as integer)
+                  between 1 and 12
             """
         ).fetchdf()
     finally:
@@ -276,14 +293,14 @@ def _section_scopes(
             str(code),
         ),
     )
-    scopes = [SectionScope("all", "Alle seksjonar", "Alle seksjonar", 0)]
+    scopes = [SectionScope("all", "Alle kostnadssteder", "Alle kostnadssteder", 0)]
     for code in codes:
         if code == "__missing__":
             scopes.append(
-                SectionScope(code, "Utan seksjonskode", "Utan seksjonskode", 99_999)
+                SectionScope(code, "Uten kostnadsstedskode", "Uten kostnadsstedskode", 99_999)
             )
             continue
-        name = names.get(str(code), "Namn manglar i dimensjonsregisteret")
+        name = names.get(str(code), "Navn mangler i dimensjonsregisteret")
         sort_order = int(code) if str(code).isdigit() else 90_000
         scopes.append(SectionScope(str(code), name, f"{code} · {name}", sort_order))
     return tuple(scopes)
@@ -311,7 +328,8 @@ def _actual_scope(
         scoped = frame[frame["dim_4"].isin(["154322", "045101"])]
     else:
         scoped = frame[frame["dim_4"] == rule.financing]
-    scoped = scoped[scoped["period"].between("202601", end_period)]
+    start_period = f"{end_period[:4]}01"
+    scoped = scoped[scoped["period"].between(start_period, end_period)]
     if section_code != "all":
         scoped = scoped[scoped["section_code"] == section_code]
     if rule.project:
@@ -325,7 +343,9 @@ def _budget_scope(
     end_period: str,
     section_code: str,
 ) -> pd.DataFrame:
-    scoped = frame[frame["period"].between("202601", end_period)]
+    year = end_period[:4]
+    scoped = frame[frame["period"].between(f"{year}01", end_period)]
+    scoped = scoped[scoped["budget_version"] == f"{year}B"]
     scoped = scoped[scoped["financing"] == rule.financing]
     if section_code != "all":
         scoped = scoped[scoped["section_code"] == section_code]
@@ -375,9 +395,26 @@ def build_dashboard_kpi_frame(
     section_names = _read_section_names(dimension_values_source)
     sections = _section_scopes(actual, budget, section_names)
 
+    periods = sorted(actual["period"].dropna().astype(str).unique())
+    if not periods:
+        raise ValueError("Hovedbokskilden inneholder ingen gyldige rapportperioder")
+
+    latest_period = periods[-1]
     rows: list[dict[str, object]] = []
     for section in sections:
-        for period_key, end_period in PERIODS.items():
+        for end_period in periods:
+            period_year = int(end_period[:4])
+            period_month = int(end_period[4:6])
+            period_fields = {
+                "period_key": end_period,
+                "end_period": end_period,
+                "period_year": period_year,
+                "period_month": period_month,
+                "period_label": f"{MONTH_NAMES[period_month - 1]} {period_year}",
+                "period_sort": int(end_period),
+                "is_latest_period": end_period == latest_period,
+                "budsjettversjon": f"{period_year}B",
+            }
             for rule in METRIC_RULES:
                 actual_scope = _actual_scope(actual, rule, end_period, section.code)
                 section_fields = {
@@ -408,8 +445,7 @@ def build_dashboard_kpi_frame(
                     rows.append(
                         {
                             **section_fields,
-                            "period_key": period_key,
-                            "end_period": end_period,
+                            **period_fields,
                             "finansiering": rule.financing,
                             "metric": rule.metric,
                             "tittel": rule.title,
@@ -458,8 +494,7 @@ def build_dashboard_kpi_frame(
                 rows.append(
                     {
                         **section_fields,
-                        "period_key": period_key,
-                        "end_period": end_period,
+                        **period_fields,
                         "finansiering": rule.financing,
                         "metric": rule.metric,
                         "tittel": rule.title,
@@ -485,8 +520,8 @@ def build_dashboard_kpi_frame(
     result = pd.DataFrame(rows)
     result["kilde_hovedbok"] = actual_source.name
     result["kilde_budsjett"] = (
-        f"{budget_header_source.name} + {budget_value_source.name}, versjon 2026B"
+        f"{budget_header_source.name} + {budget_value_source.name}, "
+        "opprinnelig budsjett for valgt år"
     )
     result["regelversjon"] = BUSINESS_RULE_VERSION
-    result["budsjettversjon"] = "2026B"
     return result

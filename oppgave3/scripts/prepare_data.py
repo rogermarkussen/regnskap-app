@@ -18,9 +18,8 @@ except ImportError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PARQUET_DIR = task3_sources().generated_dir / "evidence"
+PARQUET_DIR = task3_sources().generated_dir / "web"
 SOURCE_DIR = ROOT / "sources" / "regnskap"
-DUCKDB_PATH = SOURCE_DIR / "regnskap.duckdb"
 
 
 def write_table(connection: duckdb.DuckDBPyConnection, name: str, frame) -> Path:
@@ -56,17 +55,7 @@ def main() -> None:
     finally:
         writer.close()
 
-    if DUCKDB_PATH.exists():
-        DUCKDB_PATH.unlink()
-    database = duckdb.connect(DUCKDB_PATH)
-    try:
-        for name, path in outputs.items():
-            database.execute(
-                f"create table {name} as select * from read_parquet('{path.as_posix()}')"
-            )
-    finally:
-        database.close()
-    print("Oppgave 3: skrev 7 isolerte datatabeller")
+    print("Oppgave 3: skrev 7 isolerte datatabeller for webappen")
 
 
 if __name__ == "__main__":

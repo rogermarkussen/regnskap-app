@@ -480,7 +480,7 @@ den kontrolleres raskt i mellomtabellen. Eksempel for `711 - SID!C7`:
 
 ```sql
 select hovedbok_maaned_nok
-from read_parquet('data/evidence/monthly_close_summary.parquet')
+from read_parquet('data/web/monthly_close_summary.parquet')
 where omfang = 'Seksjon'
   and omfang_id = '711'
   and finansiering = '154301'

@@ -5,6 +5,16 @@ export const BUSINESS_RULE_VERSION = '2026-08-06';
 export const BUDGET_VERSION = '2026B';
 
 const PERIODS = {
+  202601: '202601',
+  202602: '202602',
+  202603: '202603',
+  202604: '202604',
+  202605: '202605',
+  202606: '202606',
+  202607: '202607'
+};
+
+const LEGACY_PERIODS = {
   p1_3: '202603',
   p1_4: '202604',
   p1_6: '202606'
@@ -54,8 +64,8 @@ export const mergeOperationalFileSelection = (currentFiles, newFiles) => {
   return [...byName.values()];
 };
 
-const expectedCalculatedRows = new Map(
-  Object.keys(PERIODS).flatMap((periodKey) => METRIC_RULES.map((rule) => [
+const expectedRowsFor = (periods) => new Map(
+  Object.keys(periods).flatMap((periodKey) => METRIC_RULES.map((rule) => [
     `${periodKey}|${rule.financing}|${rule.metric}`,
     rule
   ]))
@@ -190,8 +200,12 @@ const closeEnough = (left, right) => Math.abs(left - right) <= 1e-8 * Math.max(1
 
 export const validateCalculatedRows = (inputRows) => {
   const rows = normalizeCalculatedRows(inputRows);
+  const periods = rows.every((row) => Object.hasOwn(PERIODS, row.period_key))
+    ? PERIODS
+    : LEGACY_PERIODS;
+  const expectedCalculatedRows = expectedRowsFor(periods);
   if (rows.length !== expectedCalculatedRows.size) {
-    throw new Error('Beregnet KPI-Parquet må inneholde nøyaktig 27 rader');
+    throw new Error(`Beregnet KPI-Parquet må inneholde nøyaktig ${expectedCalculatedRows.size} rader`);
   }
 
   const seen = new Set();
@@ -204,8 +218,8 @@ export const validateCalculatedRows = (inputRows) => {
     if (row.tittel !== rule.title) {
       throw new Error(`Feil tittel for ${key}: forventet «${rule.title}»`);
     }
-    if (row.end_period !== PERIODS[row.period_key]) {
-      throw new Error(`Feil sluttperiode for ${key}: forventet ${PERIODS[row.period_key]}`);
+    if (row.end_period !== periods[row.period_key]) {
+      throw new Error(`Feil sluttperiode for ${key}: forventet ${periods[row.period_key]}`);
     }
     if (row.regelversjon !== BUSINESS_RULE_VERSION) {
       throw new Error(
@@ -274,7 +288,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
       period: text(row.period),
       amount_tusen: (number(row.amount) ?? 0) / 1000
     }))
-    .filter((row) => row.period >= '202601' && row.period <= '202606');
+    .filter((row) => row.period >= '202601' && row.period <= '202607');
 
   const headers = new Map(
     budgetHeaderRows
@@ -284,7 +298,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
   const budget = budgetValueRows.flatMap((valueRow) => {
     const header = headers.get(text(valueRow.trans_id));
     const period = text(valueRow.period);
-    if (!header || period < '202601' || period > '202606') return [];
+    if (!header || period < '202601' || period > '202607') return [];
     return [{
       account: text(header.account),
       dim_1: text(header.dim_1),

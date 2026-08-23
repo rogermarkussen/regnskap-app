@@ -160,9 +160,9 @@ men må bekreftes faglig som riktig kontantgrunnlag før produksjonsbruk.
 | `scripts/workflow_data.py` | Normaliserer workflow og kobler mot regnskap |
 | `scripts/monthly_close_data.py` | Beregner månedsavslutning og fyller Excel-malen |
 | `scripts/validate_task3.py` | Kontrollerer korn og sikre koblinger |
-| `data/evidence/workflow_invoice_status.parquet` | Én rapportlinje per fakturanummer |
-| `data/evidence/workflow_invoice_validation.parquet` | Kontrollresultater |
-| `pages/index.md` | Evidence-side og dataspørringer |
+| `generated/.../oppgave3/web/workflow_invoice_status.parquet` | Én rapportlinje per fakturanummer |
+| `generated/.../oppgave3/web/workflow_invoice_validation.parquet` | Kontrollresultater |
+| `src/App.svelte` | Statisk appskall og datalasting |
 | `components/WorkflowInvoiceReport.svelte` | Filtre, tabell og detaljvisning |
 | `components/MonthlyCloseReport.svelte` | Seksjon, finansiering, Nkom-total og Excel-nedlasting |
 

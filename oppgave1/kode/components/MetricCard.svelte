@@ -12,14 +12,14 @@
   const clampPercent = (value) => Math.max(0, Math.min(100, Number(value ?? 0) * 100));
   const statusLabel = (status) => ({
     danger: 'Over budsjett',
-    warning: 'Nær budsjett',
-    ok: 'Innanfor budsjett'
-  }[status] ?? 'Ikkje vurdert');
+    warning: 'Nær budsjett'
+  }[status] ?? 'Ikke vurdert');
 
   $: isRatio = row.tittel === 'Lønnsandel';
   $: hasBudget = hasValue(row.budsjett_nok1000);
   $: railValue = isRatio ? row.prosentverdi : row.budsjettandel;
   $: railWidth = `${clampPercent(railValue)}%`;
+  $: ratioPercent = clampPercent(row.prosentverdi);
   $: actualValue = isRatio ? pct(row.prosentverdi) : nok1000(row.hovedbok_nok1000);
   $: remaining = Number(row.gjenstaar_nok1000 ?? 0);
 </script>
@@ -27,54 +27,63 @@
 <article
   class="metric-card status-{row.status ?? 'neutral'}"
   class:featured
+  class:ratio-card={isRatio}
   data-metric-title={row.tittel}
 >
   <header class="metric-header">
     <div>
-      <span>{isRatio ? 'Andel' : 'Hovudbok'}</span>
       <h3>{row.tittel}</h3>
     </div>
-    {#if row.status}
+    {#if row.status && row.status !== 'ok'}
       <span class="status-pill {row.status}">{statusLabel(row.status)}</span>
     {/if}
   </header>
 
-  <div class="metric-value-row">
-    <strong class="big-number">{actualValue}</strong>
-    {#if !isRatio}<span>NOK 1 000</span>{/if}
-  </div>
-
   {#if isRatio}
-    <div class="ratio-copy">Lønn av totale kostnader</div>
-    <div
-      class="budget-rail ratio"
-      role="progressbar"
-      aria-label="{row.tittel}: {actualValue}"
-      aria-valuenow={clampPercent(railValue)}
-      aria-valuemin="0"
-      aria-valuemax="100"
-    ><span style:width={railWidth}></span></div>
-  {:else if hasBudget}
-    <div class="comparison">
-      <div><span>Budsjett</span><strong>{nok1000(row.budsjett_nok1000)}</strong></div>
-      <div>
-        <span>{remaining < 0 ? 'Over' : 'Står att'}</span>
-        <strong class:negative={remaining < 0}>{nok1000(Math.abs(remaining))}</strong>
+    <div class="ratio-visual" role="img" aria-label="Lønnsandel: {actualValue}">
+      <div class="ratio-chart">
+        <svg viewBox="0 0 42 42" aria-hidden="true">
+          <circle class="ratio-track" cx="21" cy="21" r="15.9155" pathLength="100"></circle>
+          <circle
+            class="ratio-slice"
+            cx="21"
+            cy="21"
+            r="15.9155"
+            pathLength="100"
+            stroke-dasharray="{ratioPercent} {100 - ratioPercent}"
+          ></circle>
+        </svg>
+        <strong>{actualValue}</strong>
       </div>
     </div>
-    <div
-      class="budget-rail {row.status ?? ''}"
-      role="progressbar"
-      aria-label="Brukt del av budsjettet"
-      aria-valuenow={clampPercent(railValue)}
-      aria-valuemin="0"
-      aria-valuemax="100"
-    ><span style:width={railWidth}></span><i title="Budsjettgrense"></i></div>
   {:else}
-    <div class="missing-budget">
-      <span></span>
-      Budsjett manglar for dette utvalet
+    <div class="metric-value-row">
+      <strong class="big-number">{actualValue}</strong>
+      <span>NOK 1 000</span>
     </div>
+
+    {#if hasBudget}
+      <div class="comparison">
+        <div><span>Budsjett</span><strong>{nok1000(row.budsjett_nok1000)}</strong></div>
+        <div>
+          <span>{remaining < 0 ? 'Over' : 'Gjenstår'}</span>
+          <strong class:negative={remaining < 0}>{nok1000(Math.abs(remaining))}</strong>
+        </div>
+      </div>
+      <div
+        class="budget-rail {row.status ?? ''}"
+        role="progressbar"
+        aria-label="Brukt del av budsjettet"
+        aria-valuenow={clampPercent(railValue)}
+        aria-valuemin="0"
+        aria-valuemax="100"
+      ><span style:width={railWidth}></span><i title="Budsjettgrense"></i></div>
+    {:else}
+      <div class="missing-budget">
+        <span></span>
+        Budsjett mangler for dette utvalget
+      </div>
+    {/if}
   {/if}
 </article>
 
@@ -96,6 +105,10 @@
     border-top-color: #2f80c2;
   }
 
+  .metric-card.ratio-card {
+    grid-template-rows: auto 1fr;
+  }
+
   .metric-card.status-warning { border-top-color: #d89b31; }
   .metric-card.status-danger { border-top-color: #c95656; }
   .metric-card.status-ok { border-top-color: #3b9170; }
@@ -111,7 +124,6 @@
     min-width: 0;
   }
 
-  .metric-header > div > span,
   .comparison span {
     color: #668097;
     font-size: 9px;
@@ -121,7 +133,7 @@
   }
 
   .metric-header h3 {
-    margin: 2px 0 0;
+    margin: 0;
     color: #17324b;
     font-size: 14px;
     font-weight: 700;
@@ -219,10 +231,43 @@
     background: #0b1f36;
   }
 
-  .ratio-copy {
-    align-self: end;
-    color: #5f788d;
-    font-size: 11px;
+  .ratio-visual {
+    align-self: center;
+    display: grid;
+    place-items: center;
+  }
+
+  .ratio-chart {
+    position: relative;
+    width: min(148px, 100%);
+    aspect-ratio: 1;
+  }
+
+  .ratio-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ratio-track,
+  .ratio-slice {
+    fill: none;
+    stroke-width: 7;
+  }
+
+  .ratio-track { stroke: #dce8f0; }
+  .ratio-slice { stroke: #2f80c2; }
+
+  .ratio-chart strong {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    color: #0b1f36;
+    font-size: clamp(30px, 2.4vw, 38px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    transform: translate(-50%, -50%);
   }
 
   .missing-budget {
@@ -246,5 +291,6 @@
   @media (max-width: 780px) {
     .metric-card { min-height: 192px; }
     .big-number { font-size: 38px; }
+    .ratio-chart { width: min(160px, 100%); }
   }
 </style>

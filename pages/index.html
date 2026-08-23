@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Regnskapsrapporter</title>
+    <style>
+      :root { font-family: Inter, Aptos, "Segoe UI", system-ui, sans-serif; color: #102a43; background: #eaf1f6; }
+      * { box-sizing: border-box; }
+      body { min-width: 320px; min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 32px; }
+      main { width: min(940px, 100%); }
+      .eyebrow { color: #2f80c2; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 7px 0 9px; font-size: clamp(34px, 6vw, 60px); letter-spacing: -.045em; line-height: 1; }
+      .intro { max-width: 680px; margin: 0; color: #577086; line-height: 1.55; }
+      .reports { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 34px; }
+      a { min-height: 180px; padding: 25px; border: 1px solid #cad8e3; border-top: 4px solid #2f80c2; border-radius: 12px; background: #fff; color: inherit; text-decoration: none; box-shadow: 0 16px 38px rgba(15, 42, 67, .09); }
+      a:hover { border-color: #8bbbdc; transform: translateY(-2px); }
+      a:focus-visible { outline: 3px solid rgba(47, 128, 194, .35); outline-offset: 4px; }
+      a span { color: #2f80c2; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+      a strong { display: block; margin: 12px 0 7px; font-size: 23px; }
+      a small { color: #637b90; font-size: 13px; line-height: 1.45; }
+      .privacy { margin-top: 25px; color: #587164; font-size: 12px; }
+      @media (max-width: 760px) { .reports { grid-template-columns: 1fr; } a { min-height: 0; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Datafrie rapportgrensesnitt</p>
+      <h1>Regnskapsrapporter</h1>
+      <p class="intro">Velg en oppgave. Rapporten åpnes uten tall og ber deg velge den lokale datamappen som hører til oppgaven.</p>
+      <nav class="reports" aria-label="Velg rapport">
+        <a href="./oppgave1/"><span>Oppgave 1</span><strong>Økonomisk status</strong><small>Dashboard for budsjett, regnskap og nøkkeltall.</small></a>
+        <a href="./oppgave2/"><span>Oppgave 2</span><strong>Kontogruppering</strong><small>Virksomhets-, investerings- og kontantregnskap.</small></a>
+        <a href="./oppgave3/"><span>Oppgave 3</span><strong>Regnskapskontroll</strong><small>Månedsavslutning og fakturaflyt.</small></a>
+      </nav>
+      <p class="privacy">Ingen regnskapsdata ligger på nettstedet. Lokale filer leses bare i nettleserfanen og lastes ikke opp.</p>
+    </main>
+  </body>
+</html>

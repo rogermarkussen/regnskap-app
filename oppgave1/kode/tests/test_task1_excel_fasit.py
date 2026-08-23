@@ -76,55 +76,55 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
     def test_alle_uavhengig_reproduserbare_dashboardtall(self) -> None:
         checks = [
-            ("p1_3", "154301", "ADK", "budsjett_nok1000", "D10"),
+            ("202603", "154301", "ADK", "budsjett_nok1000", "D10"),
             (
-                "p1_3",
+                "202603",
                 "154301",
                 "Konsulentkostnader",
                 "hovedbok_nok1000",
                 "C11",
             ),
             (
-                "p1_3",
+                "202603",
                 "154301",
                 "Konsulentkostnader",
                 "budsjett_nok1000",
                 "D11",
             ),
-            ("p1_3", "154301", "Reisekostnader", "hovedbok_nok1000", "C12"),
-            ("p1_3", "154301", "Reisekostnader", "budsjett_nok1000", "D12"),
-            ("p1_3", "154301", "Overtid", "hovedbok_nok1000", "C13"),
-            ("p1_3", "154301", "Overtid", "budsjett_nok1000", "D13"),
+            ("202603", "154301", "Reisekostnader", "hovedbok_nok1000", "C12"),
+            ("202603", "154301", "Reisekostnader", "budsjett_nok1000", "D12"),
+            ("202603", "154301", "Overtid", "hovedbok_nok1000", "C13"),
+            ("202603", "154301", "Overtid", "budsjett_nok1000", "D13"),
             (
-                "p1_4",
+                "202604",
                 "154345",
                 "Totalt regnskap vs budsjett",
                 "hovedbok_nok1000",
                 "C21",
             ),
             (
-                "p1_4",
+                "202604",
                 "154345",
                 "Totalt regnskap vs budsjett",
                 "budsjett_nok1000",
                 "D21",
             ),
             (
-                "p1_3",
+                "202603",
                 "154322+045101",
                 "ADK",
                 "hovedbok_nok1000",
                 "C29",
             ),
             (
-                "p1_3",
+                "202603",
                 "154322+045101",
                 "ADK",
                 "budsjett_nok1000",
                 "D29",
             ),
             (
-                "p1_3",
+                "202603",
                 "154322+045101",
                 "Testlab",
                 "hovedbok_nok1000",
@@ -136,12 +136,12 @@ class Task1ExcelFasitTest(unittest.TestCase):
                 self.assert_matches(*check)
 
     def test_tidligere_kildeavvik_er_lukket_av_nyere_hovedbok(self) -> None:
-        calculated_adk = self.value("p1_3", "154301", "ADK", "hovedbok_nok1000")
+        calculated_adk = self.value("202603", "154301", "ADK", "hovedbok_nok1000")
         expected_adk = float(self.fasit["C10"].value)
         self.assertAlmostEqual(calculated_adk, expected_adk, delta=0.00001)
 
         calculated_ratio = self.value(
-            "p1_3",
+            "202603",
             "154301",
             "Lønnsandel av totale kostnader",
             "prosentverdi",
@@ -149,8 +149,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
         expected_ratio = float(self.fasit["C15"].value)
         self.assertAlmostEqual(calculated_ratio, expected_ratio, delta=1e-10)
 
-    def test_alle_27_kortlinjer_har_sporbart_regnestykke(self) -> None:
-        self.assertEqual(len(self.aggregate), 27)
+    def test_alle_63_kortlinjer_har_sporbart_regnestykke(self) -> None:
+        self.assertEqual(len(self.aggregate), 63)
         self.assertEqual(
             set(self.calculated["kilde_hovedbok"]), {"agltransact.parquet"}
         )
@@ -205,7 +205,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
         ratio = self.calculated[
             (self.calculated["section_code"] == "all")
-            & (self.calculated["period_key"] == "p1_3")
+            & (self.calculated["period_key"] == "202603")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Lønnsandel av totale kostnader")
         ].iloc[0]
@@ -219,7 +219,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
         testlab = self.calculated[
             (self.calculated["section_code"] == "all")
-            & (self.calculated["period_key"] == "p1_3")
+            & (self.calculated["period_key"] == "202603")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Testlab")
         ].iloc[0]
@@ -228,7 +228,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
     def test_manglende_testlab_budsjett_blir_ikke_gjort_til_excel_null(self) -> None:
         match = self.calculated[
             (self.calculated["section_code"] == "all")
-            & (self.calculated["period_key"] == "p1_3")
+            & (self.calculated["period_key"] == "202603")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Testlab")
         ].iloc[0]
@@ -274,7 +274,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
         def metric(frame, name):
             return frame[
                 (frame["section_code"] == "all")
-                & (frame["period_key"] == "p1_3")
+                & (frame["period_key"] == "202603")
                 & (frame["finansiering"] == "154301")
                 & (frame["metric"] == name)
             ].iloc[0]
@@ -367,7 +367,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
         aggregate = calculated_without_fasit[
             calculated_without_fasit["section_code"] == "all"
         ]
-        self.assertEqual(len(aggregate), 27)
+        self.assertEqual(len(aggregate), 63)
         self.assertEqual(
             set(aggregate["finansiering"]),
             {"154301", "154345", "154322+045101"},
@@ -378,10 +378,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertIn("251", set(self.calculated["section_code"]))
         self.assertIn("__missing__", set(self.calculated["section_code"]))
         counts = self.calculated.groupby("section_code").size()
-        self.assertTrue((counts == 27).all())
+        self.assertTrue((counts == 63).all())
 
         adk = self.calculated[
-            (self.calculated["period_key"] == "p1_6")
+            (self.calculated["period_key"] == "202606")
             & (self.calculated["finansiering"] == "154301")
             & (self.calculated["metric"] == "ADK")
         ]

@@ -1,7 +1,8 @@
 # Regnskapsløsningen
 
-Løsningen består av tre statiske Evidence-apper som bygges fra eksterne,
-versjonerte datasnapshots. Repositoryet inneholder ikke operative data.
+Løsningen består av tre statiske apper som bygges fra eksterne, versjonerte
+datasnapshots. Repositoryet inneholder ikke operative data. Oppgave 2 og 3
+bruker Vite/Svelte uten Evidence. Oppgave 1 bruker fortsatt Evidence.
 
 | Oppgave | Formål | Resultat |
 | --- | --- | --- |
@@ -17,7 +18,7 @@ Eksternt, uforanderlig datasnapshot
   -> appspesifikk dataadapter
   -> beregninger fra operative kilder
   -> avledede Parquet-tabeller utenfor repoet
-  -> Evidence/DuckDB og statisk bygg
+  -> appspesifikk statisk bygging
   -> publiseringskontroll
 
 Ekstern fasit
@@ -38,10 +39,11 @@ datagrunnlag, Excel-fasit, komponenter og nettleserflyt.
 
 ## Oppgave 2
 
-Oppgave 2 grupperer kontoer og viser hovedbok, budsjett, kontant og avvik.
-Produksjonsbygg har bare tekniske valideringstabeller. Excel-fasit er skilt ut
-i `oppgave2/kode/tests/fasit_support.py`. Tre operative Excel-kilder er fortsatt
-midlertidige og må erstattes av Parquet når økonomisystemet tilbyr dem.
+Oppgave 2 grupperer kontoer og viser hovedbok, budsjett, kontant og avvik. Den
+statiske appen kan filtrere på finansiering, periode og seksjon/kostnadssted.
+Den leser én ZSTD-komprimert, avledet Parquet-fil i nettleseren. Excel-fasit er
+skilt ut i `oppgave2/kode/tests/fasit_support.py`. Tre operative Excel-kilder er
+fortsatt midlertidige og må erstattes av Parquet når økonomisystemet tilbyr dem.
 
 ## Oppgave 3
 

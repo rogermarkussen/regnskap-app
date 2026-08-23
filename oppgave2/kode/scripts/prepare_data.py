@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 
 import duckdb
@@ -18,17 +19,24 @@ CODE_ROOT = Path(__file__).resolve().parents[1]
 ROOT = CODE_ROOT.parent
 SOURCES = task2_sources()
 SOURCE_DATA_DIR = SOURCES.dashboard_workbook.parent
-PARQUET_DIR = SOURCES.generated_dir / "evidence"
-SOURCE_DIR = CODE_ROOT / "sources" / "regnskap"
-DUCKDB_PATH = SOURCE_DIR / "regnskap.duckdb"
+PARQUET_DIR = SOURCES.generated_dir / "static-app"
 
 SOURCE_DASHBOARD_WORKBOOK = SOURCES.dashboard_workbook
 GROUPING_WORKBOOK = SOURCES.account_grouping_workbook
 RAW_TRANSACTION_WORKBOOK = SOURCES.raw_transactions_workbook
 BUDGET_HEADER_PARQUET = SOURCES.budget_header
 BUDGET_VALUE_PARQUET = SOURCES.budget_values
+DIMENSION_VALUES_PARQUET = SOURCES.dimension_values
 LEDGER_PARQUET = SOURCES.ledger
 BUDGET_VERSION = "2026B"
+
+
+@dataclass(frozen=True)
+class SectionScope:
+    code: str
+    name: str
+    label: str
+    sort_order: int
 
 FINANCE_SHEETS = {
     "Finansiering 154301": "154301",
@@ -330,6 +338,7 @@ def synapse_budget_by_account(
     dim_1: str | None = None,
     dim_2: str | None = None,
     exclude_dim_1: tuple[str, ...] = (),
+    section_code: str | None = None,
 ) -> dict[str, dict[str, float]]:
     """Returner operativt 2026B-budsjett per konto og måned for ett rapportvalg."""
     missing = [
@@ -354,6 +363,9 @@ def synapse_budget_by_account(
             placeholders = ", ".join("?" for _ in exclude_dim_1)
             filters.append(f"(h.dim_1 is null or trim(h.dim_1) not in ({placeholders}))")
             parameters.extend(exclude_dim_1)
+        if section_code is not None:
+            filters.append("trim(h.dim_1) = ?")
+            parameters.append(section_code)
         budget_rows = conn.execute(
             f"""
             select
@@ -383,6 +395,7 @@ def parquet_actuals_by_account(
     financings: tuple[str, ...],
     period_to: int,
     project: str | None = None,
+    section_code: str | None = None,
 ) -> dict[str, dict[str, float]]:
     """Summer hovedbok fra kanonisk Parquet uten å lese Excel."""
     if not LEDGER_PARQUET.exists():
@@ -396,6 +409,9 @@ def parquet_actuals_by_account(
     if project is not None:
         filters.append("trim(dim_2) = ?")
         parameters.append(project)
+    if section_code is not None:
+        filters.append("trim(dim_1) = ?")
+        parameters.append(section_code)
     conn = duckdb.connect()
     try:
         frame = conn.execute(
@@ -414,14 +430,19 @@ def parquet_actuals_by_account(
     return _sum_by_account(frame, ["hovedbok_tusen"])
 
 
-def calculated_account_values() -> dict[
+def calculated_account_values(section_code: str | None = None) -> dict[
     tuple[str, str], dict[str, dict[str, float | None]]
 ]:
-    finance = finance_rows_frame(SOURCE_DASHBOARD_WORKBOOK)
-    finance = finance[finance["row_type"] == "account"].copy()
-    snapshot_actuals = raw_actuals_frame()
-    all_financing_budget = synapse_budget_by_account()
-    mapped_154301_budget = synapse_budget_by_account(exclude_dim_1=("212", "761"))
+    finance = None
+    snapshot_actuals = None
+    if section_code is None:
+        finance = finance_rows_frame(SOURCE_DASHBOARD_WORKBOOK)
+        finance = finance[finance["row_type"] == "account"].copy()
+        snapshot_actuals = raw_actuals_frame()
+    all_financing_budget = synapse_budget_by_account(section_code=section_code)
+    mapped_154301_budget = synapse_budget_by_account(
+        exclude_dim_1=("212", "761"), section_code=section_code
+    )
     source_months = [f"periode_{period}_tusen" for period in range(202601, 202613)]
     result: dict[tuple[str, str], dict[str, dict[str, float | None]]] = {}
 
@@ -437,14 +458,18 @@ def calculated_account_values() -> dict[
             "budget_financing": ["154345"],
             "cash_financing": ["154345"],
             "cash_period": "p1_4",
-            "parquet_budget": synapse_budget_by_account(dim_1="212"),
+            "parquet_budget": synapse_budget_by_account(
+                dim_1="212", section_code=section_code
+            ),
             "actual_financings": ("154345",),
         },
         "154322+045101": {
             "budget_financing": ["154322+045101"],
             "cash_financing": ["154322+045101"],
             "cash_period": "p1_3",
-            "parquet_budget": synapse_budget_by_account(dim_1="761"),
+            "parquet_budget": synapse_budget_by_account(
+                dim_1="761", section_code=section_code
+            ),
             "actual_financings": ("154322", "045101"),
         },
         "alle": {
@@ -459,24 +484,37 @@ def calculated_account_values() -> dict[
     }
 
     for report_financing, rule in rules.items():
-        budget_rows = finance[finance["finansiering"].isin(rule["budget_financing"])]
-        cash_rows = finance[finance["finansiering"].isin(rule["cash_financing"])]
-        snapshot_budget = _sum_by_account(budget_rows, source_months)
-        snapshot_cash = _sum_by_account(
-            cash_rows, ["kontant_budsjett_tusen", "kontant_tusen"]
-        )
+        snapshot_budget: dict[str, dict[str, float | None]] = {}
+        snapshot_cash: dict[str, dict[str, float | None]] = {}
+        if finance is not None:
+            budget_rows = finance[finance["finansiering"].isin(rule["budget_financing"])]
+            cash_rows = finance[finance["finansiering"].isin(rule["cash_financing"])]
+            snapshot_budget = _sum_by_account(budget_rows, source_months)
+            snapshot_cash = _sum_by_account(
+                cash_rows, ["kontant_budsjett_tusen", "kontant_tusen"]
+            )
 
         for period_key, (period_to, _) in TASK2_PERIODS.items():
             # Behold den tidligere avstemte Jan–Mar-beregningen for 154301 og
             # alle. Andre perioder og finansieringer beregnes fra Parquet.
-            if period_key == "p1_3" and report_financing == "154301":
+            if (
+                section_code is None
+                and period_key == "p1_3"
+                and report_financing == "154301"
+            ):
                 budget = snapshot_budget
+                assert snapshot_actuals is not None
                 actual_rows = snapshot_actuals[
                     snapshot_actuals["finansiering"].isin(["154301"])
                 ]
                 actual = _sum_by_account(actual_rows, ["hovedbok_tusen"])
-            elif period_key == "p1_3" and report_financing == "alle":
+            elif (
+                section_code is None
+                and period_key == "p1_3"
+                and report_financing == "alle"
+            ):
                 budget = all_financing_budget
+                assert snapshot_actuals is not None
                 actual = _sum_by_account(snapshot_actuals, ["hovedbok_tusen"])
             else:
                 budget = rule["parquet_budget"]
@@ -484,9 +522,10 @@ def calculated_account_values() -> dict[
                     financings=rule["actual_financings"],
                     period_to=period_to,
                     project=rule.get("project"),
+                    section_code=section_code,
                 )
 
-            cash_available = period_key == rule["cash_period"]
+            cash_available = section_code is None and period_key == rule["cash_period"]
             cash = snapshot_cash if cash_available else {}
             accounts = set(budget) | set(cash) | set(actual)
             values_by_account: dict[str, dict[str, float | None]] = {}
@@ -554,9 +593,63 @@ def _empty_account_values() -> dict[str, float | None]:
     return values
 
 
-def grouped_finance_rows_frame() -> pd.DataFrame:
+def section_scopes() -> tuple[SectionScope, ...]:
+    missing = [
+        path.name
+        for path in (LEDGER_PARQUET, BUDGET_HEADER_PARQUET, DIMENSION_VALUES_PARQUET)
+        if not path.exists()
+    ]
+    if missing:
+        raise FileNotFoundError(f"Mangler kilder for seksjonsfilter: {', '.join(missing)}")
+
+    conn = duckdb.connect()
+    try:
+        rows = conn.execute(
+            f"""
+            with relevant_codes as (
+              select distinct trim(dim_1) as code
+              from read_parquet('{LEDGER_PARQUET.as_posix()}')
+              where trim(dim_4) in ('154301', '154345', '154322', '045101')
+                and trim(dim_1) <> ''
+              union
+              select distinct trim(dim_1) as code
+              from read_parquet('{BUDGET_HEADER_PARQUET.as_posix()}')
+              where version = '{BUDGET_VERSION}'
+                and trim(dim_1) <> ''
+            ), names as (
+              select
+                trim(dim_value) as code,
+                any_value(trim(description)) as name
+              from read_parquet('{DIMENSION_VALUES_PARQUET.as_posix()}')
+              where attribute_id = 'C1'
+              group by 1
+            )
+            select
+              relevant_codes.code,
+              coalesce(names.name, 'Navn mangler i dimensjonsregisteret') as name
+            from relevant_codes
+            left join names using (code)
+            order by try_cast(relevant_codes.code as integer), relevant_codes.code
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    scopes = [SectionScope("all", "Alle seksjoner", "Alle seksjoner", 0)]
+    for code, name in rows:
+        sort_order = int(code) if str(code).isdigit() else 90_000
+        scopes.append(SectionScope(str(code), str(name), f"{code} · {name}", sort_order))
+    return tuple(scopes)
+
+
+def grouped_finance_rows_frame(
+    scope: SectionScope | None = None,
+) -> pd.DataFrame:
+    selected_scope = scope or SectionScope("all", "Alle seksjoner", "Alle seksjoner", 0)
     structure = grouping_structure()
-    account_values = calculated_account_values()
+    account_values = calculated_account_values(
+        None if selected_scope.code == "all" else selected_scope.code
+    )
     rows: list[dict[str, object]] = []
 
     report_options = [
@@ -583,20 +676,31 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
             f"{LEDGER_PARQUET.name}; {BUDGET_HEADER_PARQUET.name}; "
             f"{BUDGET_VALUE_PARQUET.name} ({BUDGET_VERSION})"
         )
-        if period_key == "p1_3" and financing in {"154301", "alle"}:
+        if (
+            selected_scope.code == "all"
+            and period_key == "p1_3"
+            and financing in {"154301", "alle"}
+        ):
             source_files = f"{SOURCE_DASHBOARD_WORKBOOK.name}; {RAW_TRANSACTION_WORKBOOK.name}"
             if financing == "alle":
                 source_files += f"; {BUDGET_HEADER_PARQUET.name}; {BUDGET_VALUE_PARQUET.name} ({BUDGET_VERSION})"
-        if period_key == (
+        if selected_scope.code == "all" and period_key == (
             "p1_4" if financing == "154345" else "p1_3"
         ):
             source_files += f"; {SOURCE_DASHBOARD_WORKBOOK.name} (kun kontant)"
+        scope_fields = {
+            "section_code": selected_scope.code,
+            "section_name": selected_scope.name,
+            "section_label": selected_scope.label,
+            "section_sort": selected_scope.sort_order,
+        }
         excel_row = 1
         report_rows: list[dict[str, object]] = []
         main_groups = list(dict.fromkeys(str(group["hovedgruppe"]) for group in structure))
         for main_group in main_groups:
             report_rows.append(
                 {
+                    **scope_fields,
                     "finansiering": financing,
                     "finansiering_tekst": financing_label,
                     "rapportperiode": period_key,
@@ -646,6 +750,7 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
                             "kontant_avvik_tusen": None,
                         }
                     account_row = {
+                        **scope_fields,
                         "finansiering": financing,
                         "finansiering_tekst": financing_label,
                         "rapportperiode": period_key,
@@ -673,6 +778,7 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
                     continue
                 report_rows.append(
                     {
+                        **scope_fields,
                         "finansiering": financing,
                         "finansiering_tekst": financing_label,
                         "rapportperiode": period_key,
@@ -695,6 +801,7 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
 
             report_rows.append(
                 {
+                    **scope_fields,
                     "finansiering": financing,
                     "finansiering_tekst": financing_label,
                     "rapportperiode": period_key,
@@ -714,6 +821,7 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
         all_accounts = [row for row in report_rows if row["row_type"] == "account"]
         report_rows.append(
             {
+                **scope_fields,
                 "finansiering": financing,
                 "finansiering_tekst": financing_label,
                 "rapportperiode": period_key,
@@ -734,6 +842,35 @@ def grouped_finance_rows_frame() -> pd.DataFrame:
 
 def grouped_finance_rows(conn: duckdb.DuckDBPyConnection) -> Path:
     return write_parquet(conn, "grouped_finance_rows", grouped_finance_rows_frame())
+
+
+def section_grouped_finance_rows(conn: duckdb.DuckDBPyConnection) -> Path:
+    frames = [grouped_finance_rows_frame(scope) for scope in section_scopes()[1:]]
+    return write_parquet(conn, "section_grouped_finance_rows", pd.concat(frames, ignore_index=True))
+
+
+def write_static_app_data(
+    grouped_path: Path,
+    section_grouped_path: Path,
+) -> Path:
+    PARQUET_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = PARQUET_DIR / "task2-report.parquet"
+    conn = duckdb.connect()
+    try:
+        conn.execute(
+            f"""
+            copy (
+              select * from read_parquet('{grouped_path.as_posix()}')
+              union all by name
+              select * from read_parquet('{section_grouped_path.as_posix()}')
+              order by section_sort, finansiering, rapportperiode, excel_row
+            ) to '{output_path.as_posix()}'
+            (format parquet, compression zstd)
+            """
+        )
+    finally:
+        conn.close()
+    return output_path
 
 
 def grouped_finance_validation(conn: duckdb.DuckDBPyConnection) -> Path:
@@ -861,21 +998,8 @@ def grouped_finance_validation(conn: duckdb.DuckDBPyConnection) -> Path:
     return write_parquet(conn, "grouped_finance_validation", pd.DataFrame(results))
 
 
-def rebuild_duckdb(parquet_outputs: list[tuple[str, Path]]) -> None:
-    SOURCE_DIR.mkdir(parents=True, exist_ok=True)
-    if DUCKDB_PATH.exists():
-        DUCKDB_PATH.unlink()
-    conn = duckdb.connect(DUCKDB_PATH)
-    try:
-        for name, path in parquet_outputs:
-            conn.execute(f"create table {name} as select * from read_parquet('{path.as_posix()}')")
-    finally:
-        conn.close()
-
-
 def main() -> None:
     PARQUET_DIR.mkdir(parents=True, exist_ok=True)
-    SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     for path in PARQUET_DIR.glob("*.parquet"):
         path.unlink()
 
@@ -887,6 +1011,7 @@ def main() -> None:
         parquet_outputs = [
             ("account_groups", account_groups(conn)),
             ("grouped_finance_rows", grouped_finance_rows(conn)),
+            ("section_grouped_finance_rows", section_grouped_finance_rows(conn)),
             ("grouped_finance_validation", grouped_finance_validation(conn)),
         ]
     finally:
@@ -896,10 +1021,13 @@ def main() -> None:
             if path.exists():
                 path.unlink()
 
-    rebuild_duckdb(parquet_outputs)
+    static_data_path = write_static_app_data(
+        dict(parquet_outputs)["grouped_finance_rows"],
+        dict(parquet_outputs)["section_grouped_finance_rows"],
+    )
 
     print(f"Wrote {len(parquet_outputs)} parquet tables to {PARQUET_DIR}")
-    print(f"Wrote Evidence DuckDB source to {DUCKDB_PATH.relative_to(ROOT)}")
+    print(f"Wrote local app data to {static_data_path}")
 
 
 if __name__ == "__main__":

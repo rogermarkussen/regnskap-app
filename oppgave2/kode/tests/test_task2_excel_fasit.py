@@ -95,7 +95,7 @@ class Task2LatestPeriodTest(unittest.TestCase):
 
 class Task2ReportPeriodTest(unittest.TestCase):
     def test_january_to_june_budget_is_sum_of_first_six_months(self) -> None:
-        rows_path = CONTRACT.generated_dir("oppgave2") / "evidence" / "grouped_finance_rows.parquet"
+        rows_path = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
         month_columns = [f"budsjett_20260{month}_tusen" for month in range(1, 7)]
         month_sum = " + ".join(f"coalesce({column}, 0)" for column in month_columns)
 
@@ -120,7 +120,7 @@ class Task2ReportPeriodTest(unittest.TestCase):
         self.assertEqual(errors, 0)
 
     def test_investment_columns_follow_154345_rule(self) -> None:
-        rows_path = CONTRACT.generated_dir("oppgave2") / "evidence" / "grouped_finance_rows.parquet"
+        rows_path = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
         connection = duckdb.connect()
         try:
             mismatches = connection.execute(

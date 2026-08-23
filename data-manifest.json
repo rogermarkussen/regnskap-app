@@ -24,6 +24,13 @@
       "classification": "confidential",
       "sha256": "bd52f1bf683f93d2e8cb626c6fc15d7358a1581762b2ef605469d273a08b7e26"
     },
+    "common.dimension_values": {
+      "path": "snapshots/2026-08-23/operative/oppgave1/agldimvalue.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "7234ae8c1ad9b4177bd36037d819d6de2540f1a6de1649efda30b9b71e1a3b39"
+    },
     "task1.dimension_values": {
       "path": "snapshots/2026-08-23/operative/oppgave1/agldimvalue.parquet",
       "format": "parquet",

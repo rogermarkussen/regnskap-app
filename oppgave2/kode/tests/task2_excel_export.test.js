@@ -7,7 +7,7 @@ import writeExcelFile from 'write-excel-file/node';
 import {
   createTask2WorkbookSheets,
   task2WorkbookFilename
-} from '../components/task2ExcelExport.js';
+} from '../src/lib/task2ExcelExport.js';
 
 const decode = (value) => new TextDecoder().decode(value);
 
@@ -39,4 +39,8 @@ test('Excel-eksporten lager fire lesbare faner med forventede verdier', async ()
   assert.match(allXml, /Finansiering/);
   assert.match(worksheetXml, /<c r="B2"[^>]*><v>12\.5<\/v><\/c>/);
   assert.equal(task2WorkbookFilename('154301', '01–03 2026'), 'kontogruppering-154301-01-03-2026.xlsx');
+  assert.equal(
+    task2WorkbookFilename('154301', '01–03 2026', '421'),
+    'kontogruppering-154301-01-03-2026-seksjon-421.xlsx'
+  );
 });
