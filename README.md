@@ -50,3 +50,5 @@ offentlig hosting. Se [`deployment-policy.json`](deployment-policy.json).
 
 En mer faglig oversikt finnes i
 [`REGNSKAPSOVERSIKT.md`](REGNSKAPSOVERSIKT.md).
+Kjente avhengighetsfunn og publiseringskrav er dokumentert i
+[`SECURITY.md`](SECURITY.md).
