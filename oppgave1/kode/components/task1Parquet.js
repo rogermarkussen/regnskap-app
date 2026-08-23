@@ -508,7 +508,10 @@ export const loadCalculatedParquetFile = async (files) => {
   if (!calculated || actual || budgetHeader || budgetValue) {
     throw new Error('Filen har ikke skjema for beregnede KPI-er');
   }
-  return validateCalculatedRows(calculated.rows);
+  const aggregateRows = calculated.rows.some((row) => text(row.section_code))
+    ? calculated.rows.filter((row) => text(row.section_code) === 'all')
+    : calculated.rows;
+  return validateCalculatedRows(aggregateRows);
 };
 
 export const loadDashboardRowsFromParquetFiles = async (files) => {

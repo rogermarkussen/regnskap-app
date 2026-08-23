@@ -33,6 +33,14 @@ class MetricRule:
     ratio_denominator: tuple[int, int] | None = None
 
 
+@dataclass(frozen=True)
+class SectionScope:
+    code: str
+    name: str
+    label: str
+    sort_order: int
+
+
 PERIODS = {
     "p1_3": "202603",
     "p1_4": "202604",
@@ -60,7 +68,9 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
 
     missing = [path.as_posix() for path in source_paths if not path.is_file()]
     if missing:
-        raise FileNotFoundError(f"Mangler operative Parquet-kilder: {', '.join(missing)}")
+        raise FileNotFoundError(
+            f"Mangler operative Parquet-kilder: {', '.join(missing)}"
+        )
 
     connection = duckdb.connect()
     try:
@@ -124,6 +134,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
             }
         ]
     )
+
 
 METRIC_RULES = (
     MetricRule("154301", "ADK", "ADK", 6110, 7834),
@@ -196,6 +207,10 @@ def _read_sources(
               cast(account as varchar) as account,
               cast(dim_4 as varchar) as dim_4,
               cast(dim_2 as varchar) as dim_2,
+              case
+                when dim_1 is null or trim(cast(dim_1 as varchar)) = '' then '__missing__'
+                else trim(cast(dim_1 as varchar))
+              end as section_code,
               cast(period as varchar) as period,
               try_cast(amount as double) / 1000.0 as amount_tusen
             from read_parquet('{actual_path.as_posix()}')
@@ -208,6 +223,10 @@ def _read_sources(
               cast(h.account as varchar) as account,
               cast(h.dim_1 as varchar) as dim_1,
               cast(h.dim_2 as varchar) as dim_2,
+              case
+                when h.dim_1 is null or trim(cast(h.dim_1 as varchar)) = '' then '__missing__'
+                else trim(cast(h.dim_1 as varchar))
+              end as section_code,
               cast(v.period as varchar) as period,
               try_cast(v.amount as double) / 1000.0 as amount_tusen
             from read_parquet('{budget_header_path.as_posix()}') h
@@ -225,6 +244,51 @@ def _read_sources(
     return actual, budget
 
 
+def _read_section_names(path: Path) -> dict[str, str]:
+    connection = duckdb.connect()
+    try:
+        rows = connection.execute(
+            f"""
+            select
+              trim(cast(dim_value as varchar)) as section_code,
+              any_value(trim(cast(description as varchar))) as section_name
+            from read_parquet('{path.as_posix()}')
+            where attribute_id = 'C1'
+              and dim_value is not null
+            group by 1
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+    return {str(code): str(name) for code, name in rows if code}
+
+
+def _section_scopes(
+    actual: pd.DataFrame,
+    budget: pd.DataFrame,
+    names: dict[str, str],
+) -> tuple[SectionScope, ...]:
+    codes = sorted(
+        set(actual["section_code"].dropna()) | set(budget["section_code"].dropna()),
+        key=lambda code: (
+            code == "__missing__",
+            int(code) if str(code).isdigit() else 10_000,
+            str(code),
+        ),
+    )
+    scopes = [SectionScope("all", "Alle seksjonar", "Alle seksjonar", 0)]
+    for code in codes:
+        if code == "__missing__":
+            scopes.append(
+                SectionScope(code, "Utan seksjonskode", "Utan seksjonskode", 99_999)
+            )
+            continue
+        name = names.get(str(code), "Namn manglar i dimensjonsregisteret")
+        sort_order = int(code) if str(code).isdigit() else 90_000
+        scopes.append(SectionScope(str(code), name, f"{code} · {name}", sort_order))
+    return tuple(scopes)
+
+
 def _accounts(frame: pd.DataFrame, rule: MetricRule) -> pd.DataFrame:
     if rule.accounts:
         return frame[frame["account"].isin(rule.accounts)]
@@ -237,20 +301,34 @@ def _accounts(frame: pd.DataFrame, rule: MetricRule) -> pd.DataFrame:
     ]
 
 
-def _actual_scope(frame: pd.DataFrame, rule: MetricRule, end_period: str) -> pd.DataFrame:
+def _actual_scope(
+    frame: pd.DataFrame,
+    rule: MetricRule,
+    end_period: str,
+    section_code: str,
+) -> pd.DataFrame:
     if rule.financing == "154322+045101":
         scoped = frame[frame["dim_4"].isin(["154322", "045101"])]
     else:
         scoped = frame[frame["dim_4"] == rule.financing]
     scoped = scoped[scoped["period"].between("202601", end_period)]
+    if section_code != "all":
+        scoped = scoped[scoped["section_code"] == section_code]
     if rule.project:
         scoped = scoped[scoped["dim_2"] == rule.project]
     return scoped
 
 
-def _budget_scope(frame: pd.DataFrame, rule: MetricRule, end_period: str) -> pd.DataFrame:
+def _budget_scope(
+    frame: pd.DataFrame,
+    rule: MetricRule,
+    end_period: str,
+    section_code: str,
+) -> pd.DataFrame:
     scoped = frame[frame["period"].between("202601", end_period)]
     scoped = scoped[scoped["financing"] == rule.financing]
+    if section_code != "all":
+        scoped = scoped[scoped["section_code"] == section_code]
     if rule.project:
         return scoped[scoped["dim_2"] == rule.project]
     return scoped
@@ -263,7 +341,9 @@ def _ratio_sum(frame: pd.DataFrame, bounds: tuple[int, int]) -> float:
     return float(selected["amount_tusen"].sum())
 
 
-def _status(actual: float, budget: float | None) -> tuple[float | None, str | None, str | None]:
+def _status(
+    actual: float, budget: float | None
+) -> tuple[float | None, str | None, str | None]:
     if budget in (None, 0):
         return None, None, None
     share = actual / budget
@@ -280,108 +360,127 @@ def build_dashboard_kpi_frame(
     actual_path: Path | None = None,
     budget_header_path: Path | None = None,
     budget_value_path: Path | None = None,
+    dimension_values_path: Path | None = None,
 ) -> pd.DataFrame:
     sources = task1_sources()
     actual_source = actual_path or sources.ledger
     budget_header_source = budget_header_path or sources.budget_header
     budget_value_source = budget_value_path or sources.budget_values
+    dimension_values_source = dimension_values_path or sources.dimension_values
     actual, budget = _read_sources(
         actual_source,
         budget_header_source,
         budget_value_source,
     )
+    section_names = _read_section_names(dimension_values_source)
+    sections = _section_scopes(actual, budget, section_names)
 
     rows: list[dict[str, object]] = []
-    for period_key, end_period in PERIODS.items():
-        for rule in METRIC_RULES:
-            actual_scope = _actual_scope(actual, rule, end_period)
-            if rule.ratio_numerator and rule.ratio_denominator:
-                numerator = _ratio_sum(actual_scope, rule.ratio_numerator)
-                denominator = _ratio_sum(actual_scope, rule.ratio_denominator)
-                ratio = numerator / denominator if denominator else None
-                details = [
-                    {"label": "Lønnskostnader", "value": numerator},
-                    {
-                        "label": "Totale kostnader",
-                        "value": denominator,
-                    },
-                ]
-                if ratio is not None:
-                    details.append(
-                        {"label": "Andel (%)", "value": ratio * 100, "format": "pct"}
+    for section in sections:
+        for period_key, end_period in PERIODS.items():
+            for rule in METRIC_RULES:
+                actual_scope = _actual_scope(actual, rule, end_period, section.code)
+                section_fields = {
+                    "section_code": section.code,
+                    "section_name": section.name,
+                    "section_label": section.label,
+                    "section_sort": section.sort_order,
+                }
+                if rule.ratio_numerator and rule.ratio_denominator:
+                    numerator = _ratio_sum(actual_scope, rule.ratio_numerator)
+                    denominator = _ratio_sum(actual_scope, rule.ratio_denominator)
+                    ratio = numerator / denominator if denominator else None
+                    details = [
+                        {"label": "Lønnskostnader", "value": numerator},
+                        {
+                            "label": "Totale kostnader",
+                            "value": denominator,
+                        },
+                    ]
+                    if ratio is not None:
+                        details.append(
+                            {
+                                "label": "Andel (%)",
+                                "value": ratio * 100,
+                                "format": "pct",
+                            }
+                        )
+                    rows.append(
+                        {
+                            **section_fields,
+                            "period_key": period_key,
+                            "end_period": end_period,
+                            "finansiering": rule.financing,
+                            "metric": rule.metric,
+                            "tittel": rule.title,
+                            "hovedbok_nok1000": ratio,
+                            "budsjett_nok1000": None,
+                            "budsjettandel": None,
+                            "status": None,
+                            "status_tekst": None,
+                            "prosentverdi": ratio,
+                            "gjenstaar_nok1000": -ratio if ratio is not None else None,
+                            "kommentar": None,
+                            "grunnlag_json": json.dumps(details, ensure_ascii=False),
+                            "beregningsregel": (
+                                f"konto {rule.ratio_numerator[0]}–{rule.ratio_numerator[1]} "
+                                f"/ konto {rule.ratio_denominator[0]}–{rule.ratio_denominator[1]}"
+                            ),
+                        }
                     )
+                    continue
+
+                actual_rows = _accounts(actual_scope, rule)
+                budget_rows = _accounts(
+                    _budget_scope(budget, rule, end_period, section.code), rule
+                )
+                actual_by_account = actual_rows.groupby("account", as_index=False)[
+                    "amount_tusen"
+                ].sum()
+                actual_total = float(actual_by_account["amount_tusen"].sum())
+                budget_total = (
+                    None
+                    if budget_rows.empty
+                    else float(budget_rows["amount_tusen"].sum())
+                )
+                budget_share, status, status_text = _status(actual_total, budget_total)
+                details = [
+                    {"label": row.account, "value": float(row.amount_tusen)}
+                    for row in actual_by_account.itertuples()
+                    if abs(float(row.amount_tusen)) > 1e-12
+                ]
+                if rule.accounts:
+                    account_rule = ", ".join(rule.accounts)
+                else:
+                    account_rule = f"{rule.account_from}–{rule.account_to}"
+                if rule.project:
+                    account_rule += f", prosjekt {rule.project}"
                 rows.append(
                     {
+                        **section_fields,
                         "period_key": period_key,
                         "end_period": end_period,
                         "finansiering": rule.financing,
                         "metric": rule.metric,
                         "tittel": rule.title,
-                        "hovedbok_nok1000": ratio,
-                        "budsjett_nok1000": None,
-                        "budsjettandel": None,
-                        "status": None,
-                        "status_tekst": None,
-                        "prosentverdi": ratio,
-                        "gjenstaar_nok1000": -ratio if ratio is not None else None,
-                        "kommentar": None,
-                        "grunnlag_json": json.dumps(details, ensure_ascii=False),
-                        "beregningsregel": (
-                            f"konto {rule.ratio_numerator[0]}–{rule.ratio_numerator[1]} "
-                            f"/ konto {rule.ratio_denominator[0]}–{rule.ratio_denominator[1]}"
+                        "hovedbok_nok1000": actual_total,
+                        "budsjett_nok1000": budget_total,
+                        "budsjettandel": budget_share,
+                        "status": status,
+                        "status_tekst": status_text,
+                        "prosentverdi": None,
+                        "gjenstaar_nok1000": (
+                            budget_total - actual_total
+                            if budget_total is not None
+                            else None
                         ),
+                        "kommentar": (
+                            "Mangler budsjett" if budget_total is None else None
+                        ),
+                        "grunnlag_json": json.dumps(details, ensure_ascii=False),
+                        "beregningsregel": f"konto {account_rule}",
                     }
                 )
-                continue
-
-            actual_rows = _accounts(actual_scope, rule)
-            budget_rows = _accounts(_budget_scope(budget, rule, end_period), rule)
-            actual_by_account = actual_rows.groupby("account", as_index=False)[
-                "amount_tusen"
-            ].sum()
-            actual_total = float(actual_by_account["amount_tusen"].sum())
-            budget_total = (
-                None
-                if budget_rows.empty
-                else float(budget_rows["amount_tusen"].sum())
-            )
-            budget_share, status, status_text = _status(actual_total, budget_total)
-            details = [
-                {"label": row.account, "value": float(row.amount_tusen)}
-                for row in actual_by_account.itertuples()
-                if abs(float(row.amount_tusen)) > 1e-12
-            ]
-            if rule.accounts:
-                account_rule = ", ".join(rule.accounts)
-            else:
-                account_rule = f"{rule.account_from}–{rule.account_to}"
-            if rule.project:
-                account_rule += f", prosjekt {rule.project}"
-            rows.append(
-                {
-                    "period_key": period_key,
-                    "end_period": end_period,
-                    "finansiering": rule.financing,
-                    "metric": rule.metric,
-                    "tittel": rule.title,
-                    "hovedbok_nok1000": actual_total,
-                    "budsjett_nok1000": budget_total,
-                    "budsjettandel": budget_share,
-                    "status": status,
-                    "status_tekst": status_text,
-                    "prosentverdi": None,
-                    "gjenstaar_nok1000": (
-                        budget_total - actual_total
-                        if budget_total is not None
-                        else None
-                    ),
-                    "kommentar": (
-                        "Mangler budsjett" if budget_total is None else None
-                    ),
-                    "grunnlag_json": json.dumps(details, ensure_ascii=False),
-                    "beregningsregel": f"konto {account_rule}",
-                }
-            )
 
     result = pd.DataFrame(rows)
     result["kilde_hovedbok"] = actual_source.name

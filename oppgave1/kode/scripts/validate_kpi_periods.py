@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regresjonskontroller for periodeberegningene i KPI-dashboardet."""
+"""Regresjonskontroller for periodar og seksjonar i KPI-dashboardet."""
 
 import json
 import math
@@ -10,16 +10,7 @@ import duckdb
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGE = ROOT / "pages" / "index.md"
 DB = ROOT / "sources" / "regnskap" / "regnskap.duckdb"
-
-
-def query_from_page(name: str) -> str:
-    content = PAGE.read_text(encoding="utf-8")
-    match = re.search(rf"```sql {re.escape(name)}\n(.*?)\n```", content, re.DOTALL)
-    if not match:
-        raise AssertionError(f"Fant ikke SQL-blokken {name!r} i {PAGE}")
-    return match.group(1)
 
 
 def close(actual: float, expected: float, label: str) -> None:
@@ -29,7 +20,32 @@ def close(actual: float, expected: float, label: str) -> None:
 
 def main() -> None:
     connection = duckdb.connect(str(DB), read_only=True)
-    rows = connection.execute(query_from_page("fin154322_period_all")).fetchdf()
+    rows = connection.execute(
+        """
+        select * from dashboard_kpi_calculated
+        where section_code = 'all'
+          and finansiering = '154322+045101'
+        """
+    ).fetchdf()
+    section_counts = connection.execute(
+        """
+        select section_code, count(*) as antall
+        from dashboard_kpi_calculated
+        group by section_code
+        order by section_code
+        """
+    ).fetchdf()
+    section_reconciliation = connection.execute(
+        """
+        select
+          max(hovedbok_nok1000) filter (where section_code = 'all') as total,
+          sum(hovedbok_nok1000) filter (where section_code <> 'all') as seksjonssum
+        from dashboard_kpi_calculated
+        where period_key = 'p1_6'
+          and finansiering = '154301'
+          and metric = 'ADK'
+        """
+    ).fetchone()
     metadata = connection.execute(
         "select * from dashboard_kpi_source_metadata"
     ).fetchdf()
@@ -47,6 +63,15 @@ def main() -> None:
         raise AssertionError("Manglende uttrekkstidspunkt skal vises eksplisitt")
     if source.periodestatus != "Ikke dokumentert i kildefilene":
         raise AssertionError("Manglende periodestatus skal vises eksplisitt")
+    if section_counts.empty or not (section_counts.antall == 27).all():
+        raise AssertionError("Kvar seksjon skal ha ni KPI-ar i tre rapportperiodar")
+    if "all" not in set(section_counts.section_code):
+        raise AssertionError("Seksjonsfilteret manglar samla visning")
+    close(
+        float(section_reconciliation[1]),
+        float(section_reconciliation[0]),
+        "Seksjonssum mot samla ADK",
+    )
 
     adk = rows[(rows.period_key == "p1_3") & (rows.tittel == "ADK")].iloc[0]
     close(float(adk.budsjett_nok1000), 22809.75, "ADK-budsjett Jan–Mar")
@@ -65,7 +90,9 @@ def main() -> None:
 
     testlab_details = json.loads(testlab.grunnlag_json)
     testlab_total = sum(float(row["value"]) for row in testlab_details)
-    close(testlab_total, float(testlab.hovedbok_nok1000), "Testlab-total mot Vis grunnlag")
+    close(
+        testlab_total, float(testlab.hovedbok_nok1000), "Testlab-total mot Vis grunnlag"
+    )
 
     print("KPI-periodekontroller bestått")
     print(f"- Datasett-ID: {source.datasett_id_kort}")

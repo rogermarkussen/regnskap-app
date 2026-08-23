@@ -74,12 +74,13 @@ const assertOptionalNumber = (actual, expected, label) => {
 };
 
 test('nettleserberegningen gjenskaper alle KPI-radene fra operative Parquet-data', async () => {
-  const [actualRows, budgetHeaderRows, budgetValueRows, expectedRows] = await Promise.all([
+  const [actualRows, budgetHeaderRows, budgetValueRows, allExpectedRows] = await Promise.all([
     readRows(datasetPath('common.ledger')),
     readRows(datasetPath('common.budget_header')),
     readRows(datasetPath('common.budget_values')),
     readRows(generatedPath('dashboard_kpi_calculated.parquet'))
   ]);
+  const expectedRows = allExpectedRows.filter((row) => row.section_code === 'all');
 
   const calculatedRows = buildDashboardRowsFromSources({
     actualRows,
@@ -157,7 +158,8 @@ test('de syntetiske Parquet-testfilene kan lastes gjennom samme flyt som nettles
 });
 
 test('beregnet Parquet avvises ved duplikater og feil regelversjon', async () => {
-  const expectedRows = await readRows(generatedPath('dashboard_kpi_calculated.parquet'));
+  const expectedRows = (await readRows(generatedPath('dashboard_kpi_calculated.parquet')))
+    .filter((row) => row.section_code === 'all');
   const duplicateRows = expectedRows.map((row) => ({ ...row }));
   duplicateRows[1] = { ...duplicateRows[0] };
   assert.throws(() => validateCalculatedRows(duplicateRows), /Duplikat KPI-rad/);

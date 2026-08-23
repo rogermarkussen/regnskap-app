@@ -9,113 +9,69 @@ const metricCard = (panel, title) => panel.locator(`[data-metric-title="${title}
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Økonomisk status' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Seksjon' })).toContainText('Alle seksjonar');
 });
 
-test('viser bare operative KPI-er uten import, eksport eller detaljgrunnlag', async ({ page }) => {
-  await expect(page.getByText('Regnskap mot budsjett for tre finansieringer, samlet i ett styringsbilde.')).toHaveCount(0);
-  await expect(page.getByText(/Beregnet fra operative hovedbok- og budsjettdata/)).toHaveCount(0);
-  await expect(page.getByText('NOK 1 000', { exact: true })).toBeVisible();
+test('viser eit avgrensa finansdashbord utan import eller eksport', async ({ page }) => {
+  await expect(page.getByLabel('Filter for dashbordet').getByText('NOK 1 000', { exact: true }))
+    .toBeVisible();
+  await expect(page.locator('.finance-panel')).toHaveCount(3);
+  await expect(page.locator('.metric-card')).toHaveCount(9);
   await expect(page.getByRole('button', { name: /last opp/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /last ned/i })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /vis grunnlag/i })).toHaveCount(0);
-  await expect(page.getByText(/syntetisk demo/i)).toHaveCount(0);
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
 });
 
-test('viser enkel oppdateringsdato uten tekniske detaljer', async ({ page }) => {
+test('viser enkel kjeldestatus utan teknisk støy', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await expect(page.getByText(/Regnskap oppdatert til \d{2}\.\d{2}\.\d{4}/)).toBeVisible();
+  await expect(page.getByText(/\d{2}\.\d{2}\.\d{4}/).first()).toBeVisible();
+  await expect(page.getByText('Siste bokførte transaksjon')).toBeVisible();
   await expect(page.getByText('Om data og versjon', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Datasett-ID', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Teknisk periodestatus', { exact: true })).toHaveCount(0);
 });
 
-test('periodevalgene oppdaterer KPI-ene', async ({ page }) => {
-  const panel = financingPanel(page, 'Driftsutgifter (154301)');
+test('Evidence sitt periodefilter oppdaterer KPI-ane', async ({ page }) => {
+  const panel = financingPanel(page, 'Driftsutgifter');
   const adkValue = metricCard(panel, 'ADK').locator('.big-number');
 
-  await page.getByRole('button', { name: 'Jan–mar' }).click();
   const marchValue = await adkValue.textContent();
   await page.getByRole('button', { name: 'Jan–apr' }).click();
+  await expect(page.locator('.hero-context')).toContainText('Januar–april');
   const aprilValue = await adkValue.textContent();
   await page.getByRole('button', { name: 'Jan–jun' }).click();
+  await expect(page.locator('.hero-context')).toContainText('Januar–juni');
   const juneValue = await adkValue.textContent();
 
   expect(new Set([marchValue, aprilValue, juneValue]).size).toBe(3);
 });
 
-test('viser ni KPI-kort fordelt på tre finansieringer', async ({ page }) => {
-  await expect(page.locator('.finance-panel')).toHaveCount(3);
+test('seksjonsfilteret brukar dimensjon C1 og endrar tala', async ({ page }) => {
+  const panel = financingPanel(page, 'Driftsutgifter');
+  const adkValue = metricCard(panel, 'ADK').locator('.big-number');
+  const allSectionsValue = await adkValue.textContent();
+
+  await page.getByRole('combobox', { name: 'Seksjon' }).click();
+  await page.getByPlaceholder('Seksjon').fill('251');
+  await page.getByText('251 · ØS - Økonomi og styring', { exact: true }).click();
+
+  await expect(page.locator('.hero-context')).toContainText('251 · ØS - Økonomi og styring');
+  await expect(adkValue).not.toHaveText(allSectionsValue ?? '');
   await expect(page.locator('.metric-card')).toHaveCount(9);
-  await expect(page.getByRole('heading', { name: 'Driftsutgifter (154301)' })).toBeVisible();
-  await expect(page.getByRole('heading', {
-    name: 'Større utstyrsanskaffelser og vedlikehold (154345)'
-  })).toBeVisible();
-  await expect(page.getByRole('heading', {
-    name: 'Nytt nødnett inkl. innleide konsulenter (154322/045101)'
-  })).toBeVisible();
 });
 
-test('kan sammenligne fem presentasjonsversjoner uten å endre tallene', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  const firstValue = await page.locator('.metric-card .big-number').first().textContent();
-  const panelBoxes = async () => Promise.all(
-    [0, 1, 2].map((index) => page.locator('.finance-panel').nth(index).boundingBox())
-  );
-
-  await page.getByRole('button', { name: 'Vis versjoner' }).click();
-  await expect(page.getByRole('region', { name: 'Presentasjonsversjoner' })).toBeVisible();
-  await expect(page.locator('.variant-options button')).toHaveCount(5);
-
-  await page.getByRole('button', { name: /1 · Tre kolonner/ }).click();
-  await expect(page.locator('.metric-card.card')).toHaveCount(9);
-  await expect(page.locator('.metric-card.card .progress').first()).toBeVisible();
-  const columns = await panelBoxes();
-  expect(Math.abs(columns[0].y - columns[1].y)).toBeLessThan(5);
-  expect(columns[1].x).toBeGreaterThan(columns[0].x);
-  expect(columns[2].x).toBeGreaterThan(columns[1].x);
-
-  await page.getByRole('button', { name: /2 · Finansieringsrader/ }).click();
-  await expect(page.locator('.metric-card.row')).toHaveCount(9);
-  await expect(page.locator('.row-chart')).toHaveCount(9);
-  const rows = await panelBoxes();
-  expect(Math.abs(rows[0].x - rows[1].x)).toBeLessThan(5);
-  expect(rows[1].y).toBeGreaterThan(rows[0].y);
-  expect(rows[2].y).toBeGreaterThan(rows[1].y);
-
-  await page.getByRole('button', { name: /3 · Hovedfokus/ }).click();
-  await expect(page.locator('.metric-card.focus')).toHaveCount(9);
-  await expect(page.locator('.donut')).toHaveCount(9);
-  const focus = await panelBoxes();
-  expect(focus[1].x).toBeGreaterThan(focus[0].x);
-  expect(Math.abs(focus[1].x - focus[2].x)).toBeLessThan(5);
-  expect(focus[2].y).toBeGreaterThan(focus[1].y);
-
-  await page.getByRole('button', { name: /4 · Kontrollpanel/ }).click();
-  await expect(page.locator('.metric-card.table-row')).toHaveCount(9);
-  await expect(page.locator('.microbar')).toHaveCount(9);
-  const controls = await page.locator('.dashboard-controls').boundingBox();
-  const finance = await page.locator('.finance-grid').boundingBox();
-  expect(finance.x).toBeGreaterThan(controls.x + controls.width);
-
-  await page.getByRole('button', { name: /5 · Møtevisning/ }).click();
-  await expect(page.locator('.metric-card.stage')).toHaveCount(9);
-  await expect(page.locator('.stage-chart')).toHaveCount(9);
-  const meeting = await panelBoxes();
-  expect(meeting[0].width).toBeGreaterThan(meeting[1].width * 1.5);
-  expect(Math.abs(meeting[1].y - meeting[2].y)).toBeLessThan(5);
-  expect(meeting[2].x).toBeGreaterThan(meeting[1].x);
-
-  await expect(page.locator('.dashboard-shell')).toHaveClass(/variant-v5/);
-  await expect(page.locator('.metric-card .big-number').first()).toHaveText(firstValue ?? '');
+test('deler dei ni KPI-ane i eitt hovudområde og to sekundærområde', async ({ page }) => {
+  await expect(financingPanel(page, 'Driftsutgifter').locator('.metric-card')).toHaveCount(5);
+  await expect(financingPanel(page, 'Utstyr og vedlikehald').locator('.metric-card')).toHaveCount(1);
+  await expect(financingPanel(page, 'Nytt nødnett').locator('.metric-card')).toHaveCount(3);
+  await expect(page.locator('.budget-rail')).toHaveCount(8);
+  await expect(page.locator('.dashboard-shell')).not.toHaveClass(/variant-/);
+  await expect(page.getByRole('button', { name: /vis versjoner/i })).toHaveCount(0);
 });
 
-test('bruker hovedfokus som standard, men beholder alle fem versjonene', async ({ page }) => {
-  await expect(page.locator('.dashboard-shell')).toHaveClass(/variant-v3/);
-  await expect(page.getByRole('region', { name: 'Slik leses hovedfokusvisningen' })).toBeVisible();
-  await expect(page.getByText('Andre driftskostnader').first()).toBeVisible();
-  await expect(page.getByText('Ringen viser brukt andel av budsjettet. For prosenttall viser den beregnet andel.')).toBeVisible();
-  await expect(page.getByText('Nær budsjett', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Vis versjoner' }).click();
-  await expect(page.locator('.variant-options button')).toHaveCount(5);
+test('beheld leserekkefølgja på mobil', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const headings = await page.locator('.panel-heading h2').allTextContents();
+  expect(headings).toEqual(['Driftsutgifter', 'Utstyr og vedlikehald', 'Nytt nødnett']);
+  await expect(page.getByRole('combobox', { name: 'Seksjon' })).toBeVisible();
+  await expect(page.locator('.metric-card').first()).toBeVisible();
 });

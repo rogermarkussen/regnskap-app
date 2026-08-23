@@ -36,6 +36,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.calculated = build_dashboard_kpi_frame(ROOT)
+        cls.aggregate = cls.calculated[cls.calculated["section_code"] == "all"]
         cls.fasit = load_workbook(FASIT, read_only=True, data_only=True)[
             "Dashboard med tall"
         ]
@@ -47,10 +48,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
         metric: str,
         column: str,
     ) -> float:
-        match = self.calculated[
-            (self.calculated["period_key"] == period)
-            & (self.calculated["finansiering"] == financing)
-            & (self.calculated["metric"] == metric)
+        match = self.aggregate[
+            (self.aggregate["period_key"] == period)
+            & (self.aggregate["finansiering"] == financing)
+            & (self.aggregate["metric"] == metric)
         ]
         self.assertEqual(len(match), 1)
         return float(match.iloc[0][column])
@@ -135,9 +136,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
                 self.assert_matches(*check)
 
     def test_tidligere_kildeavvik_er_lukket_av_nyere_hovedbok(self) -> None:
-        calculated_adk = self.value(
-            "p1_3", "154301", "ADK", "hovedbok_nok1000"
-        )
+        calculated_adk = self.value("p1_3", "154301", "ADK", "hovedbok_nok1000")
         expected_adk = float(self.fasit["C10"].value)
         self.assertAlmostEqual(calculated_adk, expected_adk, delta=0.00001)
 
@@ -151,15 +150,15 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertAlmostEqual(calculated_ratio, expected_ratio, delta=1e-10)
 
     def test_alle_27_kortlinjer_har_sporbart_regnestykke(self) -> None:
-        self.assertEqual(len(self.calculated), 27)
-        self.assertEqual(set(self.calculated["kilde_hovedbok"]), {"agltransact.parquet"})
+        self.assertEqual(len(self.aggregate), 27)
+        self.assertEqual(
+            set(self.calculated["kilde_hovedbok"]), {"agltransact.parquet"}
+        )
         self.assertTrue(
-            self.calculated["kilde_budsjett"]
-            .str.contains("apltransact.parquet")
-            .all()
+            self.calculated["kilde_budsjett"].str.contains("apltransact.parquet").all()
         )
 
-        for row in self.calculated.itertuples():
+        for row in self.aggregate.itertuples():
             with self.subTest(period=row.period_key, metric=row.metric):
                 details = json.loads(row.grunnlag_json)
                 if not math.isnan(float(row.prosentverdi)):
@@ -178,14 +177,12 @@ class Task1ExcelFasitTest(unittest.TestCase):
                 if not math.isnan(float(row.budsjett_nok1000)):
                     self.assertAlmostEqual(
                         float(row.gjenstaar_nok1000),
-                        float(row.budsjett_nok1000)
-                        - float(row.hovedbok_nok1000),
+                        float(row.budsjett_nok1000) - float(row.hovedbok_nok1000),
                     )
                     if float(row.budsjett_nok1000) != 0:
                         self.assertAlmostEqual(
                             float(row.budsjettandel),
-                            float(row.hovedbok_nok1000)
-                            / float(row.budsjett_nok1000),
+                            float(row.hovedbok_nok1000) / float(row.budsjett_nok1000),
                         )
 
     def test_kildemetadata_identifiserer_det_lokale_datasettet(self) -> None:
@@ -207,7 +204,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertEqual(_budget_financing("711"), "154301")
 
         ratio = self.calculated[
-            (self.calculated["period_key"] == "p1_3")
+            (self.calculated["section_code"] == "all")
+            & (self.calculated["period_key"] == "p1_3")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Lønnsandel av totale kostnader")
         ].iloc[0]
@@ -220,7 +218,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
         )
 
         testlab = self.calculated[
-            (self.calculated["period_key"] == "p1_3")
+            (self.calculated["section_code"] == "all")
+            & (self.calculated["period_key"] == "p1_3")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Testlab")
         ].iloc[0]
@@ -228,7 +227,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
     def test_manglende_testlab_budsjett_blir_ikke_gjort_til_excel_null(self) -> None:
         match = self.calculated[
-            (self.calculated["period_key"] == "p1_3")
+            (self.calculated["section_code"] == "all")
+            & (self.calculated["period_key"] == "p1_3")
             & (self.calculated["finansiering"] == "154322+045101")
             & (self.calculated["metric"] == "Testlab")
         ].iloc[0]
@@ -248,9 +248,9 @@ class Task1ExcelFasitTest(unittest.TestCase):
                     copy (
                       select * from (
                         values
-                          ('5000', '154301', null, '202603', 10000.0),
-                          ('6700', '154301', null, '202603', 1000.0)
-                      ) as t(account, dim_4, dim_2, period, amount)
+                          ('5000', '154301', null, '251', '202603', 10000.0),
+                          ('6700', '154301', null, '251', '202603', 1000.0)
+                      ) as t(account, dim_4, dim_2, dim_1, period, amount)
                     ) to '{base_path.as_posix()}' (format parquet)
                     """
                 )
@@ -259,9 +259,9 @@ class Task1ExcelFasitTest(unittest.TestCase):
                     copy (
                       select * from (
                         values
-                          ('5000', '154301', null, '202603', 10000.0),
-                          ('6700', '154301', null, '202603', 2000.0)
-                      ) as t(account, dim_4, dim_2, period, amount)
+                          ('5000', '154301', null, '251', '202603', 10000.0),
+                          ('6700', '154301', null, '251', '202603', 2000.0)
+                      ) as t(account, dim_4, dim_2, dim_1, period, amount)
                     ) to '{changed_path.as_posix()}' (format parquet)
                     """
                 )
@@ -273,7 +273,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
         def metric(frame, name):
             return frame[
-                (frame["period_key"] == "p1_3")
+                (frame["section_code"] == "all")
+                & (frame["period_key"] == "p1_3")
                 & (frame["finansiering"] == "154301")
                 & (frame["metric"] == name)
             ].iloc[0]
@@ -302,9 +303,9 @@ class Task1ExcelFasitTest(unittest.TestCase):
         component = (CODE_ROOT / "components" / "ExecutiveDashboard.svelte").read_text(
             encoding="utf-8"
         )
-        calculation = (
-            CODE_ROOT / "scripts" / "dashboard_kpi_data.py"
-        ).read_text(encoding="utf-8")
+        calculation = (CODE_ROOT / "scripts" / "dashboard_kpi_data.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("dashboard_kpi_calculated", page)
         self.assertNotIn("from dashboard_kpi\n", page)
@@ -327,7 +328,9 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertIn("NOK 1 000", component)
         self.assertNotIn("/dashboard_cards.json", component)
         self.assertFalse((CODE_ROOT / "static" / "dashboard_cards.json").exists())
-        self.assertFalse((CODE_ROOT / "sources" / "regnskap" / "dashboard_kpi.sql").exists())
+        self.assertFalse(
+            (CODE_ROOT / "sources" / "regnskap" / "dashboard_kpi.sql").exists()
+        )
         self.assertNotIn("'fasit'", component)
         self.assertNotIn("Fasit/", calculation)
         self.assertNotIn("openpyxl", calculation)
@@ -361,11 +364,30 @@ class Task1ExcelFasitTest(unittest.TestCase):
                 budget_value_path=contract.path("common.budget_values"),
             )
 
-        self.assertEqual(len(calculated_without_fasit), 27)
+        aggregate = calculated_without_fasit[
+            calculated_without_fasit["section_code"] == "all"
+        ]
+        self.assertEqual(len(aggregate), 27)
         self.assertEqual(
-            set(calculated_without_fasit["finansiering"]),
+            set(aggregate["finansiering"]),
             {"154301", "154345", "154322+045101"},
         )
+
+    def test_seksjonsfilteret_er_komplett_og_avstemmer_mot_totalen(self) -> None:
+        self.assertIn("711", set(self.calculated["section_code"]))
+        self.assertIn("251", set(self.calculated["section_code"]))
+        self.assertIn("__missing__", set(self.calculated["section_code"]))
+        counts = self.calculated.groupby("section_code").size()
+        self.assertTrue((counts == 27).all())
+
+        adk = self.calculated[
+            (self.calculated["period_key"] == "p1_6")
+            & (self.calculated["finansiering"] == "154301")
+            & (self.calculated["metric"] == "ADK")
+        ]
+        total = float(adk[adk["section_code"] == "all"]["hovedbok_nok1000"].iloc[0])
+        sections = float(adk[adk["section_code"] != "all"]["hovedbok_nok1000"].sum())
+        self.assertAlmostEqual(total, sections, places=9)
 
 
 if __name__ == "__main__":
