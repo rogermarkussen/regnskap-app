@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Fra regnskapsdata til styringsinformasjon – oppgave 1–3</title>
+    <style>
+      :root {
+        --navy: #123044;
+        --navy-2: #1c4c63;
+        --teal: #247f73;
+        --teal-light: #dff1ed;
+        --blue: #2e7294;
+        --blue-light: #e9f3f8;
+        --amber: #b87916;
+        --amber-light: #fff3d9;
+        --red: #a9473f;
+        --green: #25815e;
+        --ink: #152434;
+        --muted: #617487;
+        --line: #d8e2e8;
+        --paper: #ffffff;
+        --canvas: #101d27;
+        --shadow: 0 28px 80px rgba(0, 0, 0, 0.3);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        color: var(--ink);
+        background:
+          radial-gradient(
+            circle at 15% 20%,
+            rgba(47, 116, 143, 0.25),
+            transparent 34%
+          ),
+          radial-gradient(
+            circle at 85% 80%,
+            rgba(36, 127, 115, 0.19),
+            transparent 35%
+          ),
+          var(--canvas);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      button,
+      a {
+        font: inherit;
+      }
+
+      .deck {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        padding: 18px 18px 58px;
+      }
+
+      .slide {
+        display: none;
+        position: relative;
+        width: min(calc(100vw - 36px), calc((100dvh - 78px) * 16 / 9));
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border-radius: 16px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+
+      .slide.active {
+        display: block;
+        animation: enter 260ms ease-out;
+      }
+
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.995);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .slide-inner {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: clamp(26px, 3.4vw, 58px) clamp(32px, 4.6vw, 78px);
+      }
+
+      .slide::after {
+        content: attr(data-number);
+        position: absolute;
+        right: 28px;
+        bottom: 18px;
+        color: #8a9aa7;
+        font-size: clamp(10px, 0.85vw, 14px);
+        font-weight: 750;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: clamp(12px, 1.5vw, 24px);
+        color: var(--teal);
+        font-size: clamp(10px, 0.85vw, 14px);
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .brand::before {
+        content: "";
+        width: 28px;
+        height: 5px;
+        border-radius: 99px;
+        background: var(--teal);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 1000px;
+        margin-bottom: 20px;
+        font-size: clamp(38px, 5.2vw, 82px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+      }
+
+      h2 {
+        max-width: 1150px;
+        margin-bottom: clamp(15px, 2vw, 30px);
+        font-size: clamp(29px, 3.55vw, 58px);
+        line-height: 1.07;
+        letter-spacing: -0.035em;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: clamp(16px, 1.45vw, 24px);
+        line-height: 1.18;
+      }
+
+      p,
+      li,
+      td,
+      th {
+        font-size: clamp(12px, 1.08vw, 18px);
+      }
+
+      .lead {
+        max-width: 1020px;
+        color: var(--muted);
+        font-size: clamp(17px, 1.65vw, 28px);
+        line-height: 1.45;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: clamp(10px, 0.86vw, 14px);
+      }
+
+      .grow {
+        flex: 1;
+      }
+
+      .kicker {
+        color: var(--teal);
+        font-size: clamp(12px, 1vw, 16px);
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .grid-2,
+      .grid-3,
+      .grid-4 {
+        display: grid;
+        gap: clamp(12px, 1.4vw, 23px);
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .card {
+        min-width: 0;
+        padding: clamp(14px, 1.55vw, 25px);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+      }
+
+      .card.soft {
+        background: #f5f8fa;
+      }
+
+      .card.teal {
+        border-color: #bedfd7;
+        background: #eff8f5;
+      }
+
+      .card.amber {
+        border-color: #ebce93;
+        background: #fff8e9;
+      }
+
+      .card.blue {
+        border-color: #c8deea;
+        background: #f0f7fa;
+      }
+
+      .card p:last-child,
+      .card ul:last-child {
+        margin-bottom: 0;
+      }
+
+      .num {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--navy-2);
+        font-size: clamp(30px, 3.6vw, 60px);
+        font-weight: 860;
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: clamp(11px, 0.95vw, 16px);
+        line-height: 1.35;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        color: #175f49;
+        background: #dcefe7;
+        font-size: clamp(9px, 0.75vw, 12px);
+        font-weight: 850;
+      }
+
+      .tag.warn {
+        color: #76500e;
+        background: #f8e3b8;
+      }
+
+      .tag.info {
+        color: #245e7e;
+        background: #dfedf5;
+      }
+
+      .big-list {
+        display: grid;
+        gap: clamp(9px, 1vw, 16px);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .big-list li {
+        display: grid;
+        grid-template-columns: 30px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .big-list li::before {
+        content: "✓";
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        color: white;
+        background: var(--teal);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .big-list.warn li::before {
+        content: "!";
+        background: var(--amber);
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        margin-top: 16px;
+      }
+
+      .timeline-step {
+        position: relative;
+        padding: 24px 22px 20px;
+        border-top: 5px solid var(--line);
+      }
+
+      .timeline-step::before {
+        content: attr(data-step);
+        display: grid;
+        place-items: center;
+        position: absolute;
+        top: -21px;
+        left: 22px;
+        width: 36px;
+        height: 36px;
+        border: 5px solid white;
+        border-radius: 50%;
+        color: white;
+        background: var(--teal);
+        font-weight: 900;
+      }
+
+      .timeline-step:nth-child(2) {
+        border-color: #62a7a0;
+      }
+
+      .timeline-step:nth-child(3) {
+        border-color: #347595;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .flow-node {
+        display: grid;
+        place-items: center;
+        min-width: 0;
+        padding: 16px 12px;
+        border: 1px solid #c8d8e1;
+        border-radius: 12px;
+        background: #f4f8fa;
+        text-align: center;
+      }
+
+      .flow-node strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--navy-2);
+        font-size: clamp(12px, 1vw, 17px);
+      }
+
+      .flow-node span {
+        color: var(--muted);
+        font-size: clamp(9px, 0.76vw, 13px);
+      }
+
+      .flow-arrow {
+        display: grid;
+        place-items: center;
+        color: #7893a3;
+        font-size: clamp(22px, 2vw, 34px);
+        font-weight: 850;
+      }
+
+      .bar-chart {
+        display: grid;
+        gap: 12px;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: minmax(115px, 0.85fr) 3fr auto;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .bar-label {
+        font-size: clamp(10px, 0.84vw, 14px);
+        font-weight: 760;
+      }
+
+      .bar-track {
+        height: clamp(14px, 1.25vw, 21px);
+        overflow: hidden;
+        border-radius: 99px;
+        background: #e8eef1;
+      }
+
+      .bar-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--teal), #4aa79a);
+      }
+
+      .bar-value {
+        min-width: 78px;
+        color: var(--navy-2);
+        font-size: clamp(10px, 0.82vw, 14px);
+        font-weight: 830;
+        text-align: right;
+      }
+
+      .status-stack {
+        display: grid;
+        gap: 9px;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: 24px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #d8e5df;
+        border-radius: 9px;
+        background: #f2f8f5;
+      }
+
+      .status-row.warn {
+        border-color: #ead3a4;
+        background: #fff9ed;
+      }
+
+      .status-icon {
+        display: grid;
+        place-items: center;
+        width: 23px;
+        height: 23px;
+        border-radius: 50%;
+        color: white;
+        background: var(--green);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .warn .status-icon {
+        background: var(--amber);
+      }
+
+      .status-row strong,
+      .status-row span {
+        font-size: clamp(9px, 0.77vw, 13px);
+      }
+
+      .status-row > span:last-child {
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      .table-wrap {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: clamp(8px, 0.8vw, 13px);
+        border-bottom: 1px solid #e3e9ed;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: #465e6f;
+        background: #eff4f6;
+        font-size: clamp(9px, 0.75vw, 12px);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .right {
+        text-align: right;
+      }
+
+      .quote {
+        max-width: 1080px;
+        margin: auto 0;
+        padding-left: 30px;
+        border-left: 7px solid var(--teal);
+        color: var(--navy);
+        font-size: clamp(24px, 3vw, 50px);
+        font-weight: 760;
+        line-height: 1.23;
+        letter-spacing: -0.025em;
+      }
+
+      .warning-box {
+        padding: clamp(13px, 1.25vw, 20px);
+        border-left: 6px solid var(--amber);
+        border-radius: 8px;
+        color: #684a17;
+        background: var(--amber-light);
+      }
+
+      .warning-box p:last-child {
+        margin-bottom: 0;
+      }
+
+      .demo-links {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+      }
+
+      .demo-link {
+        display: flex;
+        flex-direction: column;
+        min-height: 150px;
+        padding: 22px;
+        border: 1px solid #cddce4;
+        border-radius: 13px;
+        color: var(--ink);
+        background: #f5f9fb;
+        text-decoration: none;
+      }
+
+      .demo-link:hover {
+        border-color: var(--teal);
+        transform: translateY(-2px);
+      }
+
+      .demo-link b {
+        margin-bottom: 7px;
+        color: var(--navy-2);
+        font-size: clamp(15px, 1.3vw, 22px);
+      }
+
+      .demo-link span {
+        color: var(--muted);
+        font-size: clamp(10px, 0.86vw, 14px);
+      }
+
+      .demo-link em {
+        margin-top: auto;
+        color: var(--teal);
+        font-size: clamp(10px, 0.8vw, 13px);
+        font-style: normal;
+        font-weight: 800;
+      }
+
+      .title-slide {
+        color: white;
+        background:
+          radial-gradient(
+            circle at 84% 20%,
+            rgba(87, 184, 166, 0.28),
+            transparent 28%
+          ),
+          linear-gradient(128deg, #102b3c, #1d5868 62%, #247f73);
+      }
+
+      .title-slide::before {
+        content: "";
+        position: absolute;
+        right: -8%;
+        bottom: -30%;
+        width: 48%;
+        aspect-ratio: 1;
+        border: 55px solid rgba(255, 255, 255, 0.07);
+        border-radius: 50%;
+      }
+
+      .title-slide .brand,
+      .title-slide .lead {
+        color: #d4eeea;
+      }
+
+      .title-slide .brand::before {
+        background: #8ad6c8;
+      }
+
+      .title-slide .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: auto;
+      }
+
+      .title-slide .meta span {
+        padding: 6px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: clamp(9px, 0.74vw, 12px);
+      }
+
+      .section-slide {
+        color: white;
+        background: linear-gradient(130deg, var(--navy), var(--navy-2));
+      }
+
+      .section-slide .slide-inner {
+        justify-content: center;
+      }
+
+      .section-slide .kicker,
+      .section-slide .lead {
+        color: #bce5de;
+      }
+
+      .section-index {
+        position: absolute;
+        right: 7%;
+        bottom: 2%;
+        color: rgba(255, 255, 255, 0.08);
+        font-size: clamp(150px, 25vw, 420px);
+        font-weight: 900;
+        line-height: 0.8;
+      }
+
+      .notes {
+        display: none;
+      }
+
+      .notes-panel {
+        display: none;
+        position: fixed;
+        z-index: 20;
+        right: 18px;
+        bottom: 58px;
+        width: min(460px, calc(100vw - 36px));
+        max-height: 42vh;
+        overflow: auto;
+        padding: 18px 20px;
+        border: 1px solid #455a68;
+        border-radius: 12px;
+        color: #eaf2f5;
+        background: rgba(13, 29, 40, 0.96);
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .notes-panel.visible {
+        display: block;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: fixed;
+        z-index: 30;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 12px;
+        background: rgba(7, 20, 29, 0.88);
+        backdrop-filter: blur(10px);
+      }
+
+      .controls button {
+        display: grid;
+        place-items: center;
+        min-width: 34px;
+        height: 32px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 7px;
+        color: #dbe8ed;
+        background: transparent;
+        cursor: pointer;
+        font-weight: 750;
+      }
+
+      .controls button:hover,
+      .controls button:focus-visible {
+        color: white;
+        background: #284454;
+        outline: none;
+      }
+
+      .counter {
+        min-width: 58px;
+        color: #b8c9d1;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+
+      .progress {
+        position: fixed;
+        z-index: 35;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: #58b29f;
+        transition: width 180ms ease;
+      }
+
+      .help {
+        display: none;
+        position: fixed;
+        z-index: 40;
+        inset: 0;
+        place-items: center;
+        background: rgba(4, 13, 19, 0.72);
+      }
+
+      .help.visible {
+        display: grid;
+      }
+
+      .help-card {
+        width: min(570px, calc(100vw - 40px));
+        padding: 28px;
+        border: 1px solid #607786;
+        border-radius: 16px;
+        color: #e6f0f4;
+        background: #132936;
+        box-shadow: var(--shadow);
+      }
+
+      .help-card h2 {
+        font-size: 26px;
+      }
+
+      .shortcut-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 16px;
+      }
+
+      kbd {
+        min-width: 28px;
+        padding: 3px 7px;
+        border: 1px solid #718794;
+        border-radius: 5px;
+        background: #203b4a;
+        text-align: center;
+      }
+
+      body.overview {
+        overflow: auto;
+      }
+
+      body.overview .deck {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+        align-items: start;
+        gap: 20px;
+        height: auto;
+        padding: 30px;
+      }
+
+      body.overview .slide {
+        display: block;
+        width: 100%;
+        cursor: pointer;
+        border: 3px solid transparent;
+        border-radius: 10px;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+      }
+
+      body.overview .slide.active {
+        border-color: #64c1ad;
+      }
+
+      body.overview .slide-inner {
+        padding: 24px;
+      }
+
+      body.overview h1 {
+        font-size: 34px;
+      }
+
+      body.overview h2 {
+        font-size: 26px;
+      }
+
+      body.overview p,
+      body.overview li,
+      body.overview td,
+      body.overview th {
+        font-size: 9px;
+      }
+
+      body.overview .controls,
+      body.overview .progress {
+        position: fixed;
+      }
+
+      @media (max-width: 760px) {
+        .grid-3,
+        .grid-4 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .slide-inner {
+          padding: 24px 28px;
+        }
+
+        .flow {
+          grid-template-columns: repeat(4, 1fr);
+        }
+
+        .flow-arrow {
+          display: none;
+        }
+      }
+
+      @page {
+        size: 16in 9in;
+        margin: 0;
+      }
+
+      @media print {
+        html,
+        body {
+          width: auto;
+          height: auto;
+          overflow: visible;
+          background: white;
+        }
+
+        .deck {
+          display: block;
+          width: auto;
+          height: auto;
+          padding: 0;
+        }
+
+        .slide,
+        .slide.active {
+          display: block;
+          width: 16in;
+          height: 9in;
+          break-after: page;
+          border-radius: 0;
+          box-shadow: none;
+          animation: none;
+        }
+
+        .controls,
+        .progress,
+        .notes-panel,
+        .help {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck" aria-live="polite">
+      <section class="slide title-slide active" data-number="01">
+        <div class="slide-inner">
+          <div class="brand">Regnskapsrapportering</div>
+          <p class="kicker">Tre moduler · én helhet</p>
+          <h1>Fra regnskapsdata til styringsinformasjon</h1>
+          <p class="lead">
+            En enklere måte å følge økonomien, forstå tallene og gjennomføre
+            månedsavslutningen på.
+          </p>
+          <div class="meta">
+            <span>Presentasjon for avdelingen</span>
+            <span>Juli 2026</span>
+            <span>Oversikt · innsikt · kontroll</span>
+          </div>
+        </div>
+        <aside class="notes">
+          Åpne med behovet i avdelingen: Vi ønsker raskere oversikt, mindre
+          manuelt arbeid og bedre mulighet til å forstå hva som ligger bak
+          tallene. Presentasjonen viser tre moduler som støtter dette.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="02">
+        <div class="slide-inner">
+          <div class="brand">Dagens agenda</div>
+          <h2>Tre moduler som støtter samme arbeidsprosess</h2>
+          <div class="timeline grow">
+            <article class="timeline-step" data-step="1">
+              <p class="kicker">1 · Få oversikt</p>
+              <h3>Økonomisk status</h3>
+              <p>
+                Se forbruk, budsjett og viktige kostnadsområder på ett sted.
+              </p>
+            </article>
+            <article class="timeline-step" data-step="2">
+              <p class="kicker">2 · Forstå tallene</p>
+              <h3>Kontogruppering</h3>
+              <p>
+                Samle kontoene i forståelige grupper og vise hva som driver
+                utviklingen.
+              </p>
+            </article>
+            <article class="timeline-step" data-step="3">
+              <p class="kicker">3 · Følge opp</p>
+              <h3>Månedsavslutning</h3>
+              <p>
+                Samle regnskap og fakturaflyt og gjøre kontrollarbeidet enklere.
+              </p>
+            </article>
+          </div>
+          <p class="small">
+            Rød tråd: rask oversikt, forklarbare tall og mindre manuelt arbeid.
+          </p>
+        </div>
+        <aside class="notes">
+          Presenter dette som tre deler av samme hverdag: først ser vi status,
+          deretter forstår vi hva tallene består av, og til slutt følger vi opp
+          det som krever handling.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="03">
+        <div class="slide-inner">
+          <div class="brand">Leveransen i ett bilde</div>
+          <h2>Fra spredte data til nyttig informasjon</h2>
+          <div class="flow grow">
+            <div class="flow-node">
+              <div>
+                <strong>Datagrunnlag</strong
+                ><span>Regnskap · budsjett · fakturaflyt</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Samle og strukturere</strong
+                ><span>Felles begreper og beregninger</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Kvalitetssikre</strong
+                ><span>Kontrollere at tallene henger sammen</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Bruk i hverdagen</strong
+                ><span>Oversikt · forklaring · oppfølging</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="card teal">
+              <span class="tag">Modul 1</span>
+              <h3>Økonomisk status</h3>
+              <p>Nøkkeltall med mulighet til å se hva beløpene består av.</p>
+            </div>
+            <div class="card blue">
+              <span class="tag info">Modul 2</span>
+              <h3>Kontogruppering</h3>
+              <p>Kontoene samlet i grupper som er enklere å følge opp.</p>
+            </div>
+            <div class="card amber">
+              <span class="tag warn">Modul 3</span>
+              <h3>Månedsavslutning</h3>
+              <p>Samlet kontrollgrunnlag og tydelige saker til oppfølging.</p>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Hovedbudskapet er at brukeren slipper å lete i flere uttrekk. Dataene
+          samles, kvalitetssikres og presenteres etter behovet i arbeidsdagen.
+        </aside>
+      </section>
+
+      <section class="slide section-slide" data-number="04">
+        <div class="slide-inner">
+          <p class="kicker">Modul 1</p>
+          <h1>Økonomisk status</h1>
+          <p class="lead">
+            Se hvor vi står, hva som har endret seg og hvilke områder som bør
+            få oppmerksomhet.
+          </p>
+          <span class="section-index">1</span>
+        </div>
+        <aside class="notes">
+          Overgangsslide. Gå gjerne direkte til livevisning etter neste slide
+          dersom møtet er kort.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="05">
+        <div class="slide-inner">
+          <div class="brand">Modul 1 · dette får brukeren</div>
+          <h2>Rask oversikt – med forklaring bak hvert nøkkeltall</h2>
+          <div class="grid-2 grow">
+            <div>
+              <ul class="big-list">
+                <li>
+                  <span
+                    ><strong>Samlet økonomisk status</strong><br />Velg område
+                    og periode uten å bygge rapporten på nytt.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Viktige kostnadsområder</strong><br />Følg blant
+                    annet lønn, konsulentbruk, reise og overtid.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Forklaring ved behov</strong><br />«Vis grunnlag»
+                    viser hva tallet består av.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Enkel deling</strong><br />Filtrer visningen og
+                    eksporter grunnlaget til Excel.</span
+                  >
+                </li>
+              </ul>
+            </div>
+            <div class="card soft">
+              <p class="kicker">Eksempel · periode 1–3 · NOK 1 000</p>
+              <div class="bar-chart">
+                <div class="bar-row">
+                  <span class="bar-label">154301 ADK</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: 57%"></div>
+                  </div>
+                  <span class="bar-value">57 %</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Konsulent</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: 82%"></div>
+                  </div>
+                  <span class="bar-value">82 %</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Reise</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: 71%"></div>
+                  </div>
+                  <span class="bar-value">71 %</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Overtid</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: 83%"></div>
+                  </div>
+                  <span class="bar-value">83 %</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">154345 totalt</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: 55%"></div>
+                  </div>
+                  <span class="bar-value">55 %</span>
+                </div>
+              </div>
+              <p class="small" style="margin-top: 18px">
+                Illustrasjon av hvor stor andel av periodebudsjettet som er
+                brukt.
+              </p>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Vis ett kort og åpne «Vis grunnlag». Det viktigste er ikke antall
+          funksjoner, men at brukeren raskt ser status og kan forklare tallet.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="06">
+        <div class="slide-inner">
+          <div class="brand">Modul 1 · kvalitet</div>
+          <h2>Kontroller i løsningen fanger feil før tallene vises</h2>
+          <div class="grid-2 grow">
+            <div class="card amber">
+              <span class="tag warn">Før</span>
+              <h3>Budsjettet ble telt flere ganger</h3>
+              <p>
+                To datakilder hadde ulikt detaljnivå. Det førte til at deler av
+                budsjettet ble duplisert i beregningen.
+              </p>
+              <span class="num" style="color: var(--red)">42 612,750</span>
+              <span class="label">feil aggregert Jan–Mar-budsjett</span>
+            </div>
+            <div class="card teal">
+              <span class="tag">Etter</span>
+              <h3>Dataene samles før beregning</h3>
+              <p>
+                Datagrunnlaget behandles nå på samme nivå. En automatisk
+                kontroll sjekker både totalsummen og detaljene.
+              </p>
+              <span class="num">22 809,750</span>
+              <span class="label">korrekt Jan–Mar-budsjett</span>
+            </div>
+          </div>
+          <div class="warning-box">
+            <strong>Læring:</strong> Et pent dashboard er ikke nok. Tallene må
+            også være kontrollert og mulige å forklare.
+          </div>
+        </div>
+        <aside class="notes">
+          Fortell historien enkelt: Vi oppdaget en feil, fant årsaken og la inn
+          en kontroll som hindrer at samme feil skjer igjen.
+        </aside>
+      </section>
+
+      <section class="slide section-slide" data-number="07">
+        <div class="slide-inner">
+          <p class="kicker">Modul 2</p>
+          <h1>Kontogruppering</h1>
+          <p class="lead">
+            Gjør en lang kontoliste om til en rapport som viser hvor kostnadene
+            ligger og hva som forklarer endringene.
+          </p>
+          <span class="section-index">2</span>
+        </div>
+        <aside class="notes">
+          Overgang. Hovedpoenget i oppgave 2 er at fasit ikke lenger brukes som
+          beregningsgrunnlag.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="08">
+        <div class="slide-inner">
+          <div class="brand">Modul 2 · slik virker den</div>
+          <h2>Rapporten bygges fra regnskapsdata og kontrolleres automatisk</h2>
+          <div class="flow" style="margin-bottom: 24px">
+            <div class="flow-node">
+              <div>
+                <strong>Regnskapsdata</strong
+                ><span>Hovedbok · budsjett · kontant</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Forståelige grupper</strong
+                ><span>Fra kontoer til kostnadsområder</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Ferdig rapport</strong
+                ><span>Valgt område eller samlet oversikt</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Automatisk kontroll</strong
+                ><span>Detaljer og totaler sammenlignes</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid-4 grow">
+            <div class="card soft">
+              <span class="num">114</span
+              ><span class="label">unike kontoer dekket</span>
+            </div>
+            <div class="card soft">
+              <span class="num">16</span><span class="label">kontogrupper</span>
+            </div>
+            <div class="card soft">
+              <span class="num">3</span><span class="label">hovedgrupper</span>
+            </div>
+            <div class="card teal">
+              <span class="num">2</span
+              ><span class="label">finansieringsvalg avstemt</span>
+            </div>
+          </div>
+          <p class="small">
+            Periode 01–03 2026 · budsjettversjon 2026B · beløp i NOK 1 000.
+          </p>
+        </div>
+        <aside class="notes">
+          Forklar verdien: Rapporten oppdateres fra regnskapsdataene, mens
+          automatiske kontroller varsler dersom resultatet ikke stemmer.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="09">
+        <div class="slide-inner">
+          <div class="brand">Modul 2 · resultat</div>
+          <h2>Rapportene stemmer – fra kontonivå til totalsum</h2>
+          <div class="table-wrap grow">
+            <table>
+              <thead>
+                <tr>
+                  <th>Omfang</th>
+                  <th class="right">Budsjett 01–03</th>
+                  <th class="right">Hovedbok</th>
+                  <th class="right">Avvik</th>
+                  <th class="right">Årsbudsjett</th>
+                  <th class="right">Kontant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Finansiering 154301</strong><br /><span
+                      class="small"
+                      >beregnet = fasit</span
+                    >
+                  </td>
+                  <td class="right">80 544,524</td>
+                  <td class="right">76 639,477</td>
+                  <td class="right">3 905,047</td>
+                  <td class="right">322 087,211</td>
+                  <td class="right">70 262,216</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Alle finansieringer</strong><br /><span
+                      class="small"
+                      >beregnet = fasit</span
+                    >
+                  </td>
+                  <td class="right">116 675,118</td>
+                  <td class="right">97 658,486</td>
+                  <td class="right">19 016,632</td>
+                  <td class="right">467 834,211</td>
+                  <td class="right">82 934,834</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="grid-3" style="margin-top: 18px">
+            <div class="card teal">
+              <span class="tag">Bestått</span>
+              <h3>Kontodekning</h3>
+              <p>114 av 114 kontoer i begge rapporter.</p>
+            </div>
+            <div class="card teal">
+              <span class="tag">Bestått</span>
+              <h3>Beregningsregler</h3>
+              <p>
+                Avvik, månedsbudsjett, årsbudsjett og kontantavvik kontrolleres.
+              </p>
+            </div>
+            <div class="card amber">
+              <span class="tag warn">Følg opp</span>
+              <h3>Vedlikehold av grupper</h3>
+              <p>Endringer i kontoplanen må fanges opp og godkjennes.</p>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Tallene er i tusen kroner. Legg vekt på at både detaljene og totalene
+          er kontrollert. Det gir et tryggere utgangspunkt for oppfølging.
+        </aside>
+      </section>
+
+      <section class="slide section-slide" data-number="10">
+        <div class="slide-inner">
+          <p class="kicker">Modul 3</p>
+          <h1>Månedsavslutning</h1>
+          <p class="lead">
+            Samle regnskap og fakturaflyt, løfte frem det som krever oppfølging
+            og fylle kontrollgrunnlaget.
+          </p>
+          <span class="section-index">3</span>
+        </div>
+        <aside class="notes">
+          Denne modulen støtter selve arbeidsprosessen. Den samler informasjon
+          som i dag må finnes flere steder, og viser hva som bør følges opp.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="11">
+        <div class="slide-inner">
+          <div class="brand">Modul 3 · samlet fakturabilde</div>
+          <h2>Én faktura vises samlet – selv om den har flere aktiviteter</h2>
+          <div class="grid-2 grow">
+            <div>
+              <div class="flow" style="grid-template-columns: 1fr auto 1fr">
+                <div class="flow-node">
+                  <div>
+                    <strong>Fakturaflyt</strong
+                    ><span>Aktiviteter og status</span>
+                  </div>
+                </div>
+                <div class="flow-arrow">=</div>
+                <div class="flow-node">
+                  <div>
+                    <strong>Regnskap</strong
+                    ><span>Bokført eller ikke bokført</span>
+                  </div>
+                </div>
+              </div>
+              <div class="warning-box" style="margin-top: 18px">
+                <strong>Trygg kobling:</strong> Systemet vurderer hvor sikkert
+                fakturaen kan kobles til regnskapet, og markerer usikre treff.
+              </div>
+            </div>
+            <div class="card soft">
+              <h3>Koblingskvalitet</h3>
+              <div class="status-stack">
+                <div class="status-row">
+                  <span class="status-icon">✓</span><strong>Sikker</strong
+                  ><span>1 940</span>
+                </div>
+                <div class="status-row">
+                  <span class="status-icon">✓</span><strong>Mulig</strong
+                  ><span>3</span>
+                </div>
+                <div class="status-row warn">
+                  <span class="status-icon">!</span><strong>Tvetydig</strong
+                  ><span>433</span>
+                </div>
+                <div class="status-row warn">
+                  <span class="status-icon">!</span><strong>Ikke matchet</strong
+                  ><span>204</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="small">
+            Usikre koblinger sendes til kontroll i stedet for å bli behandlet
+            automatisk.
+          </p>
+        </div>
+        <aside class="notes">
+          Forklar at løsningen ikke later som alle koblinger er sikre. Den
+          skiller tydelig mellom det som kan brukes direkte og det et menneske
+          bør kontrollere.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="12">
+        <div class="slide-inner">
+          <div class="brand">Modul 3 · hvorfor samle informasjonen</div>
+          <h2>Mange aktiviteter blir til én forståelig status per faktura</h2>
+          <div class="grid-4" style="margin-bottom: 18px">
+            <div class="card soft">
+              <span class="num">33 815</span
+              ><span class="label">workflowoppgaver</span>
+            </div>
+            <div class="card soft">
+              <span class="num">3 557</span
+              ><span class="label">workflowflyter</span>
+            </div>
+            <div class="card soft">
+              <span class="num">2 580</span
+              ><span class="label">unike fakturanumre</span>
+            </div>
+            <div class="card amber">
+              <span class="num">2 579</span
+              ><span class="label">med aktive oppgaver</span>
+            </div>
+          </div>
+          <div class="grid-2 grow">
+            <div class="card blue">
+              <h3>483 fakturanumre</h3>
+              <p>
+                har flere behandlingsløp. Rapporten samler aktivitetene, men
+                lar brukeren åpne detaljene ved behov.
+              </p>
+            </div>
+            <div class="card amber">
+              <h3>1 911 fakturanumre</h3>
+              <p>
+                har beløp som varierer mellom aktivitetene. Løsningen bruker
+                derfor flere opplysninger når den vurderer koblingen.
+              </p>
+            </div>
+          </div>
+          <div class="warning-box">
+            <strong>Viktig prinsipp:</strong> Avdelingen må eie definisjonen av
+            hva som regnes som ferdig, pågående og til oppfølging.
+          </div>
+        </div>
+        <aside class="notes">
+          Tallene viser hvorfor vi trenger en samlet visning. Unngå å gå inn i
+          hver enkelt statuskode; forklar heller at avdelingen må være enig om
+          hva de overordnede statusene betyr.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="13">
+        <div class="slide-inner">
+          <div class="brand">Modul 3 · månedsavslutning</div>
+          <h2>Kontrollgrunnlaget fylles automatisk og peker på avvik</h2>
+          <div class="grid-3 grow">
+            <div class="card teal">
+              <span class="tag">Automatisk</span>
+              <h3>Riktig periode</h3>
+              <p>
+                Rapporten velger siste komplette periode og viser hvilken
+                periode tallene gjelder.
+              </p>
+            </div>
+            <div class="card blue">
+              <span class="tag info">Samlet oversikt</span>
+              <h3>Fem rapportområder</h3>
+              <p>
+                Viser denne måneden, forrige måned og hittil i år for hvert
+                område.
+              </p>
+            </div>
+            <div class="card amber">
+              <span class="tag warn">Kontroll</span>
+              <h3>Fakturaer til kontroll</h3>
+              <p>
+                Løfter frem fakturaer som ser klare ut i fakturaflyten, men som
+                ikke er funnet i regnskapet.
+              </p>
+            </div>
+          </div>
+          <div class="flow" style="margin-top: 20px">
+            <div class="flow-node">
+              <div>
+                <strong>Hovedbok</strong
+                ><span>Bokførte kostnader</span>
+              </div>
+            </div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-node">
+              <div>
+                <strong>Budsjett</strong
+                ><span>Måned · forrige · hittil</span>
+              </div>
+            </div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-node">
+              <div>
+                <strong>Fakturaflyt</strong><span>Status og oppfølging</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Excel-mal</strong><span>Utfylt kontrollert utkast</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Vis flyten fra tre kilder til et ferdig kontrollgrunnlag. Poenget er
+          spart tid og tydeligere oppfølging, ikke de tekniske detaljene.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="14">
+        <div class="slide-inner">
+          <div class="brand">Modul 3 · tydelig kontrollstatus</div>
+          <h2>Grønt er kontrollert – gult trenger en vurdering</h2>
+          <div class="grid-2 grow">
+            <div>
+              <h3 style="color: var(--green)">Teknisk bestått</h3>
+              <div class="status-stack">
+                <div class="status-row">
+                  <span class="status-icon">✓</span
+                  ><strong>Periode funnet</strong><span>✓</span>
+                </div>
+                <div class="status-row">
+                  <span class="status-icon">✓</span
+                  ><strong>Alle rapportområder med</strong><span>✓</span>
+                </div>
+                <div class="status-row">
+                  <span class="status-icon">✓</span
+                  ><strong>Budsjett koblet til</strong><span>✓</span>
+                </div>
+                <div class="status-row">
+                  <span class="status-icon">✓</span
+                  ><strong>Påkrevde opplysninger</strong><span>✓</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 style="color: var(--amber)">Krever faglig oppfølging</h3>
+              <div class="status-stack">
+                <div class="status-row warn">
+                  <span class="status-icon">!</span
+                  ><strong>Fakturaer til kontroll</strong><span>10</span>
+                </div>
+                <div class="status-row warn">
+                  <span class="status-icon">!</span
+                  ><strong>Eldre aktiviteter</strong><span>10</span>
+                </div>
+                <div class="status-row warn">
+                  <span class="status-icon">!</span
+                  ><strong>Datagrunnlag som må bekreftes</strong><span>3</span>
+                </div>
+                <div class="status-row warn">
+                  <span class="status-icon">!</span
+                  ><strong>Bilagsutkast til godkjenning</strong><span>10</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="warning-box">
+            <strong>Sikkerhetsvalg:</strong> Løsningen foreslår hva som bør
+            følges opp, men bokfører ikke automatisk.
+          </div>
+        </div>
+        <aside class="notes">
+          Bruk denne sliden til å forklare arbeidsdelingen: systemet gjør
+          kontrollene og prioriterer sakene, mens fagpersonene tar beslutningen.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="15">
+        <div class="slide-inner">
+          <div class="brand">Status etter tre moduler</div>
+          <h2>Dette kan vi bruke – og dette gjør vi videre</h2>
+          <div class="grid-2 grow">
+            <div class="card teal">
+              <h3>Dette fungerer nå</h3>
+              <ul class="big-list">
+                <li>
+                  <span>Økonomisk oversikt med forklaring bak tallene.</span>
+                </li>
+                <li>
+                  <span>Kontogruppering som gjør rapporten lettere å lese.</span>
+                </li>
+                <li>
+                  <span>Automatiske kontroller av detaljer og totaler.</span>
+                </li>
+                <li>
+                  <span>Samlet status for regnskap og fakturaflyt.</span>
+                </li>
+                <li>
+                  <span>Utfylt kontrollgrunnlag for månedsavslutningen.</span>
+                </li>
+              </ul>
+            </div>
+            <div class="card amber">
+              <h3>Neste steg</h3>
+              <ul class="big-list warn">
+                <li>
+                  <span>Velge hvilke nøkkeltall avdelingen vil prioritere.</span>
+                </li>
+                <li><span>Avtale én felles og oppdatert datakilde.</span></li>
+                <li><span>Godkjenne de overordnede fakturastatusene.</span></li>
+                <li><span>Prøve løsningen i en ordinær månedsavslutning.</span></li>
+                <li>
+                  <span>Fordele ansvar for innhold og videre oppfølging.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Vær tydelig på at de tre modulene allerede viser nytte. Neste steg er
+          å prøve dem i arbeidshverdagen og justere innholdet sammen med
+          brukerne.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="16">
+        <div class="slide-inner">
+          <div class="brand">Hva vi trenger fra avdelingen</div>
+          <h2>Fire enkle valg før neste fase</h2>
+          <div class="grid-2 grow">
+            <div class="card">
+              <span class="tag info">01</span>
+              <h3>Hva skal vi følge?</h3>
+              <p>
+                Prioriter nøkkeltallene og visningene som gir mest verdi i
+                oppfølgingen.
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag info">02</span>
+              <h3>Hvordan skal det grupperes?</h3>
+              <p>
+                Godkjenn en enkel og gjenkjennelig inndeling av kostnadene.
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag warn">03</span>
+              <h3>Hva krever handling?</h3>
+              <p>
+                Bli enige om når en faktura er ferdig, pågående eller må følges
+                opp.
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag warn">04</span>
+              <h3>Hvem eier prosessen?</h3>
+              <p>
+                Pek ut eiere for rapportinnhold, datagrunnlag og den videre
+                arbeidsflyten.
+              </p>
+            </div>
+          </div>
+          <p class="small">
+            Forslag: ett arbeidsmøte med brukerne for å prioritere neste
+            versjon.
+          </p>
+        </div>
+        <aside class="notes">
+          Be om konkrete prioriteringer og en eier for neste fase. Detaljene kan
+          tas i egne arbeidsmøter etter presentasjonen.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="17">
+        <div class="slide-inner">
+          <div class="brand">Anbefalt målbilde</div>
+          <h2>Én felles datakilde – flere nyttige visninger</h2>
+          <div class="flow grow">
+            <div class="flow-node">
+              <div>
+                <strong>Oppdaterte data</strong
+                ><span>Regnskap · budsjett · fakturaflyt</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Felles struktur</strong
+                ><span>Samme begreper og regler</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Automatiske kontroller</strong
+                ><span>Varsle dersom noe ikke stemmer</span>
+              </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node">
+              <div>
+                <strong>Tre moduler</strong
+                ><span>Oversikt · forklaring · oppfølging</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="card teal">
+              <h3>1. Samle</h3>
+              <p>Bruk én felles kilde som alle kan kjenne igjen og stole på.</p>
+            </div>
+            <div class="card blue">
+              <h3>2. Godkjenne</h3>
+              <p>
+                Avtal definisjoner og ansvar sammen med fagmiljøet.
+              </p>
+            </div>
+            <div class="card amber">
+              <h3>3. Produksjonssette</h3>
+              <p>
+                Ta modulene i bruk trinnvis og forbedre dem med erfaring.
+              </p>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Dette er målbildet i vanlig språk: én felles kilde og tre visninger
+          til ulike behov. Det reduserer dobbeltarbeid og gjør tallene lettere å
+          forklare.
+        </aside>
+      </section>
+
+      <section class="slide" data-number="18">
+        <div class="slide-inner">
+          <div class="brand">Live demo</div>
+          <h2>Tre moduler på omtrent sju minutter</h2>
+          <div class="demo-links grow">
+            <a
+              class="demo-link"
+              href="http://localhost:3000/"
+              target="_blank"
+              rel="noreferrer"
+              ><b>1. KPI-dashboard</b
+              ><span
+                >Vis periodevalg, statuskort og hva som ligger bak ett
+                nøkkeltall.</span
+              ><em>Åpne / →</em></a
+            >
+            <a
+              class="demo-link"
+              href="http://localhost:3000/kontogruppering"
+              target="_blank"
+              rel="noreferrer"
+              ><b>2. Kontogruppering</b
+              ><span
+                >Åpne én kostnadsgruppe og vis hvordan detaljer og totaler
+                henger sammen.</span
+              ><em>Åpne /kontogruppering →</em></a
+            >
+            <a
+              class="demo-link"
+              href="http://localhost:3000/workflow"
+              target="_blank"
+              rel="noreferrer"
+              ><b>3. Månedsavslutning</b
+              ><span
+                >Forklar grønt og gult, og vis én faktura som krever
+                oppfølging.</span
+              ><em>Åpne /workflow →</em></a
+            >
+          </div>
+          <div class="warning-box">
+            <strong>Demo-tips:</strong> Vis én god brukerhistorie per modul og
+            spar detaljspørsmålene til slutt.
+          </div>
+        </div>
+        <aside class="notes">
+          Demo-rekkefølgen følger oppgavene. Bruk maksimalt 2–3 minutter per
+          side. Unngå å grave i alle detaljer; vis ett godt eksempel per
+          leveranse.
+        </aside>
+      </section>
+
+      <section class="slide title-slide" data-number="19">
+        <div class="slide-inner">
+          <div class="brand">Oppsummering</div>
+          <p class="quote">
+            Tre moduler gir oss raskere oversikt, bedre forklaring av tallene og
+            en enklere månedsavslutning.
+          </p>
+          <div class="meta">
+            <span>Spørsmål?</span>
+            <span>Hva vil gi størst verdi for avdelingen først?</span>
+          </div>
+        </div>
+        <aside class="notes">
+          Avslutt med ett enkelt spørsmål: Hvilken av de tre modulene vil gi
+          størst verdi i arbeidshverdagen vår først?
+        </aside>
+      </section>
+    </main>
+
+    <div class="notes-panel" id="notesPanel" aria-live="polite"></div>
+
+    <div class="controls" aria-label="Presentasjonskontroller">
+      <button
+        type="button"
+        id="prev"
+        title="Forrige lysbilde (←)"
+        aria-label="Forrige lysbilde"
+      >
+        ←
+      </button>
+      <span class="counter" id="counter">1 / 19</span>
+      <button
+        type="button"
+        id="next"
+        title="Neste lysbilde (→)"
+        aria-label="Neste lysbilde"
+      >
+        →
+      </button>
+      <button
+        type="button"
+        id="overview"
+        title="Oversikt (O)"
+        aria-label="Vis oversikt"
+      >
+        ▦
+      </button>
+      <button
+        type="button"
+        id="notes"
+        title="Talernotater (N)"
+        aria-label="Vis talernotater"
+      >
+        N
+      </button>
+      <button
+        type="button"
+        id="fullscreen"
+        title="Fullskjerm (F)"
+        aria-label="Fullskjerm"
+      >
+        ⛶
+      </button>
+      <button
+        type="button"
+        id="helpButton"
+        title="Hjelp (?)"
+        aria-label="Vis tastatursnarveier"
+      >
+        ?
+      </button>
+    </div>
+    <div class="progress" id="progress"></div>
+
+    <div
+      class="help"
+      id="help"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="helpTitle"
+    >
+      <div class="help-card">
+        <h2 id="helpTitle">Presentasjonskontroller</h2>
+        <div class="shortcut-grid">
+          <kbd>→</kbd><span>Neste lysbilde</span> <kbd>←</kbd
+          ><span>Forrige lysbilde</span> <kbd>Space</kbd
+          ><span>Neste lysbilde</span> <kbd>Home</kbd
+          ><span>Første lysbilde</span> <kbd>End</kbd
+          ><span>Siste lysbilde</span> <kbd>O</kbd
+          ><span>Oversikt over alle lysbilder</span> <kbd>N</kbd
+          ><span>Vis/skjul talernotater</span> <kbd>F</kbd
+          ><span>Fullskjerm</span> <kbd>?</kbd
+          ><span>Vis/skjul denne hjelpen</span> <kbd>Esc</kbd
+          ><span>Lukk hjelp, notater eller oversikt</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const slides = [...document.querySelectorAll(".slide")];
+        const counter = document.getElementById("counter");
+        const progress = document.getElementById("progress");
+        const notesPanel = document.getElementById("notesPanel");
+        const help = document.getElementById("help");
+        let index = Math.max(
+          0,
+          Math.min(slides.length - 1, Number(location.hash.slice(1)) - 1 || 0),
+        );
+        let notesVisible = false;
+
+        const update = (nextIndex, pushHash = true) => {
+          index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+          slides.forEach((slide, i) =>
+            slide.classList.toggle("active", i === index),
+          );
+          counter.textContent = `${index + 1} / ${slides.length}`;
+          progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+          if (pushHash) history.replaceState(null, "", `#${index + 1}`);
+          const notes = slides[index].querySelector(".notes");
+          notesPanel.textContent =
+            notes?.textContent.trim() ||
+            "Ingen talernotater på dette lysbildet.";
+        };
+
+        const move = (step) => {
+          if (document.body.classList.contains("overview")) return;
+          update(index + step);
+        };
+
+        const toggleOverview = () => {
+          document.body.classList.toggle("overview");
+          notesPanel.classList.remove("visible");
+          notesVisible = false;
+          if (!document.body.classList.contains("overview"))
+            slides[index].scrollIntoView({ block: "center" });
+        };
+
+        const toggleNotes = () => {
+          if (document.body.classList.contains("overview")) return;
+          notesVisible = !notesVisible;
+          notesPanel.classList.toggle("visible", notesVisible);
+        };
+
+        const toggleFullscreen = async () => {
+          if (!document.fullscreenElement)
+            await document.documentElement.requestFullscreen?.();
+          else await document.exitFullscreen?.();
+        };
+
+        document
+          .getElementById("prev")
+          .addEventListener("click", () => move(-1));
+        document
+          .getElementById("next")
+          .addEventListener("click", () => move(1));
+        document
+          .getElementById("overview")
+          .addEventListener("click", toggleOverview);
+        document.getElementById("notes").addEventListener("click", toggleNotes);
+        document
+          .getElementById("fullscreen")
+          .addEventListener("click", toggleFullscreen);
+        document
+          .getElementById("helpButton")
+          .addEventListener("click", () => help.classList.toggle("visible"));
+        help.addEventListener("click", (event) => {
+          if (event.target === help) help.classList.remove("visible");
+        });
+
+        slides.forEach((slide, i) => {
+          slide.addEventListener("click", () => {
+            if (document.body.classList.contains("overview")) {
+              document.body.classList.remove("overview");
+              update(i);
+            }
+          });
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.target.matches("a, button, input, textarea, select"))
+            return;
+          if (event.key === "Escape") {
+            help.classList.remove("visible");
+            notesPanel.classList.remove("visible");
+            notesVisible = false;
+            document.body.classList.remove("overview");
+            return;
+          }
+          if (
+            event.key === "ArrowRight" ||
+            event.key === "PageDown" ||
+            event.key === " "
+          ) {
+            event.preventDefault();
+            move(1);
+          } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+            event.preventDefault();
+            move(-1);
+          } else if (event.key === "Home") {
+            update(0);
+          } else if (event.key === "End") {
+            update(slides.length - 1);
+          } else if (event.key.toLowerCase() === "o") {
+            toggleOverview();
+          } else if (event.key.toLowerCase() === "n") {
+            toggleNotes();
+          } else if (event.key.toLowerCase() === "f") {
+            toggleFullscreen();
+          } else if (event.key === "?") {
+            help.classList.toggle("visible");
+          }
+        });
+
+        window.addEventListener("hashchange", () => {
+          const requested = Number(location.hash.slice(1));
+          if (
+            Number.isFinite(requested) &&
+            requested >= 1 &&
+            requested <= slides.length
+          )
+            update(requested - 1, false);
+        });
+
+        update(index, false);
+      })();
+    </script>
+  </body>
+</html>

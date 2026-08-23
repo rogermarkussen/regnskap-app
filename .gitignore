@@ -1,0 +1,27 @@
+.evidence/
+.svelte-kit
+build
+node_modules
+.DS_Store
+~$*
+*:Zone.Identifier
+static/data
+*.duckdb
+*.options.yaml
+.vscode/settings.json
+.env
+.venv
+__pycache__
+*.pyc
+*.duckdb.wal
+outputs/evidence-dashboard-check.png
+playwright-report/
+test-results/
+
+# Operative data, fasit og genererte leveranser ligger i REGNSKAP_DATA_ROOT.
+**/data/
+**/data-ny/
+**/data-fra-økonomi/
+**/Fasit/
+**/outputs/
+**/static/*.xlsx

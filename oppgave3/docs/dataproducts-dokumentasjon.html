@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <title>DFO-data for 2026 - regnskap, budsjett og workflow</title>
+  <style>
+    :root {
+      --bg: #f7f7f4;
+      --panel: #fff;
+      --ink: #1f2933;
+      --muted: #5d6875;
+      --line: #d8dde3;
+      --accent: #006f8f;
+      --warn: #7a4e12;
+      --code-bg: #eef3f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      padding: 36px 48px 30px;
+      color: white;
+      background: #12313f;
+      border-bottom: 5px solid var(--accent);
+    }
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    header p {
+      margin: 0;
+      max-width: 1060px;
+      color: #dce8ed;
+      font-size: 16px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 34px 56px;
+    }
+    section {
+      margin: 0 0 18px;
+      padding: 22px 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      color: #163949;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 20px 0 8px;
+      color: #263645;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p { margin: 0 0 12px; }
+    ul, ol { margin: 8px 0 14px 22px; padding: 0; }
+    li { margin: 4px 0; }
+    code {
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.94em;
+      color: #102331;
+      background: var(--code-bg);
+      border-radius: 4px;
+    }
+    pre {
+      margin: 12px 0 4px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      color: #edf7fa;
+      background: #0f2430;
+      border-radius: 6px;
+      line-height: 1.45;
+    }
+    pre code {
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      border-radius: 0;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      margin: 12px 0 14px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      color: #263645;
+      background: #edf2f4;
+      font-weight: 700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .metric {
+      padding: 12px 14px;
+      background: #fbfcfc;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    .metric strong {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--accent);
+      font-size: 22px;
+    }
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .note {
+      margin: 12px 0;
+      padding: 11px 13px;
+      color: #173542;
+      background: #eef7fa;
+      border-left: 4px solid var(--accent);
+    }
+    .warning {
+      margin: 12px 0;
+      padding: 11px 13px;
+      color: #42301a;
+      background: #fbf4e8;
+      border-left: 4px solid var(--warn);
+    }
+    .small { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DFO-data for 2026 - regnskap, budsjett og workflow</h1>
+    <p>
+      Denne filen beskriver de analyseklarerte Parquet-filene i <code>data-ny/2026</code>.
+      Dette er 2026-uttrekket som bør brukes som standard i videre lokalt arbeid.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Kortversjon</h2>
+      <div class="grid">
+        <div class="metric"><strong>116 770</strong><span>bokførte regnskapsrader for 2026</span></div>
+        <div class="metric"><strong>33 815</strong><span>workflowrader relevante for 2026</span></div>
+        <div class="metric"><strong>18 840</strong><span>periodiserte budsjettverdier for 2026</span></div>
+      </div>
+      <p class="note">
+        Bruk <code>data-ny/2026</code> som primærkilde. Dette er enkle Parquet-filer, én fil per datasett,
+        filtrert til det vi trenger for 2026-analyser.
+      </p>
+      <p>
+        Mappen <code>data-ny</code> på nivået over inneholder samme datasett som fullhistoriske enkle
+        Parquet-filer. Den er nyttig når du trenger historikk, men dokumentasjonen her tar utgangspunkt
+        i 2026-filene.
+      </p>
+    </section>
+
+    <section>
+      <h2>Filene i data-ny/2026</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fil</th>
+            <th>Rader</th>
+            <th>Hva den inneholder</th>
+            <th>2026-filter</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>agltransact.parquet</code></td>
+            <td>116 770</td>
+            <td>Bokførte regnskapstransaksjoner.</td>
+            <td><code>fiscal_year = '2026'</code> eller <code>period LIKE '2026%'</code>.</td>
+          </tr>
+          <tr>
+            <td><code>agldimvalue.parquet</code></td>
+            <td>782</td>
+            <td>Dimensjonsverdier som brukes av 2026-regnskap eller 2026-budsjett.</td>
+            <td>Kun verdier som faktisk er brukt i relevante 2026-filer.</td>
+          </tr>
+          <tr>
+            <td><code>awftaskfin.parquet</code></td>
+            <td>33 815</td>
+            <td>Workflow-/fakturaflytoppgaver relevante for 2026.</td>
+            <td>Hele workflow-flyter der dato, fakturanummer eller bilag peker på 2026.</td>
+          </tr>
+          <tr>
+            <td><code>apltransact.parquet</code></td>
+            <td>17 579</td>
+            <td>Budsjettlinjer relevante for 2026.</td>
+            <td>Linjer koblet til 2026-budsjettverdier eller 2026-versjoner.</td>
+          </tr>
+          <tr>
+            <td><code>apltransactvalue.parquet</code></td>
+            <td>18 840</td>
+            <td>Periodiserte budsjettverdier for 2026.</td>
+            <td><code>acc_period LIKE '2026%'</code> eller <code>period LIKE '2026%'</code>.</td>
+          </tr>
+          <tr>
+            <td><code>aplversion.parquet</code></td>
+            <td>16</td>
+            <td>Budsjettversjoner brukt av 2026-budsjett.</td>
+            <td>Versjoner brukt av 2026-budsjettlinjene.</td>
+          </tr>
+          <tr>
+            <td><code>nkom_kontoplan.parquet</code></td>
+            <td>84</td>
+            <td>Lokal kontoplan/kontogruppering.</td>
+            <td>Hele kontoplanen er med, fordi den er liten og brukes som oppslag.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Hvordan lese filene lokalt</h2>
+      <p>
+        I motsetning til Spark-/Delta-lignende dataproducts-strukturen under <code>data/dataproducts</code>,
+        er <code>data-ny/2026</code> laget for enkel lokal analyse. Hvert datasett er én Parquet-fil.
+      </p>
+      <pre><code>SELECT *
+FROM read_parquet('data-ny/2026/agltransact.parquet');</code></pre>
+      <p>
+        For full historikk bruker du filene direkte i <code>data-ny</code>:
+      </p>
+      <pre><code>SELECT *
+FROM read_parquet('data-ny/awftaskfin.parquet');</code></pre>
+      <p class="warning">
+        De eldre filene direkte under <code>data/</code>, for eksempel <code>data/agltransact.parquet</code>,
+        er gamle arbeidskopier og har andre radtall. Ikke bruk dem som kilde for nye 2026-analyser.
+      </p>
+    </section>
+
+    <section>
+      <h2>Forholdet mellom data-mappene</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Mappe</th>
+            <th>Rolle</th>
+            <th>Når brukes den?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>data-ny/2026</code></td>
+            <td>Primærkilde for 2026.</td>
+            <td>Bruk denne som standard.</td>
+          </tr>
+          <tr>
+            <td><code>data-ny</code></td>
+            <td>Fullhistoriske, enkle Parquet-filer.</td>
+            <td>Bruk når du trenger historikk utenfor 2026.</td>
+          </tr>
+          <tr>
+            <td><code>data/dataproducts/dfo_data</code></td>
+            <td>Nedlastet ADLS/Synapse-dataproducts-struktur.</td>
+            <td>Bruk ved behov for å kontrollere mot originalt dataproducts-uttak.</td>
+          </tr>
+          <tr>
+            <td><code>data/*.parquet</code></td>
+            <td>Eldre flate snapshots.</td>
+            <td>Bruk bare for å reprodusere gamle analyser.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Testdata under <code>data/dataproducts/dfo_data/test</code> er ikke relevant for dette arbeidet og
+        skal ignoreres.
+      </p>
+    </section>
+
+    <section>
+      <h2>Workflowdata: hva er awftaskfin?</h2>
+      <p>
+        <code>awftaskfin.parquet</code> beskriver fakturaflyt/workflowoppgaver. Dette er ikke én rad per
+        faktura og heller ikke én rad per bokført regnskapslinje. En faktura kan ha mange workflowrader:
+        én for hvert steg, hver godkjenner, videresending, avvisning eller ventestatus.
+      </p>
+      <p>
+        2026-filen er filtrert slik at den inneholder hele flyter som er relevante for 2026. Derfor kan
+        enkelte workflowrader ha dato fra før 2026 dersom de tilhører samme <code>oid</code> som en relevant
+        2026-flyt. Dette er med vilje: hvis vi bare beholdt rader med 2026-dato, kunne vi mistet starten
+        på en fakturaflyt.
+      </p>
+
+      <h3>Viktige felt</h3>
+      <table>
+        <thead>
+          <tr><th>Felt</th><th>Betydning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>oid</code></td><td>Workflow-/objekt-id. Brukes til å samle flere oppgaver i samme flyt.</td></tr>
+          <tr><td><code>task_id</code>, <code>orig_task_id</code></td><td>Oppgave og eventuell opprinnelig oppgave.</td></tr>
+          <tr><td><code>wf_status</code></td><td>Status for oppgaven: aktiv, fullført, avvist, videresendt osv.</td></tr>
+          <tr><td><code>wf_user_id</code></td><td>Brukeren oppgaven ligger hos eller er knyttet til.</td></tr>
+          <tr><td><code>real_user</code></td><td>Brukeren som faktisk utførte handlingen, når handlingen er utført.</td></tr>
+          <tr><td><code>orig_user</code></td><td>Opprinnelig bruker i workflowen.</td></tr>
+          <tr><td><code>action_date</code></td><td>Når handlingen ble utført.</td></tr>
+          <tr><td><code>distr_date</code></td><td>Når oppgaven ble distribuert/sendt i workflow.</td></tr>
+          <tr><td><code>ready_date</code></td><td>Når oppgaven ble klar.</td></tr>
+          <tr><td><code>col*_descr</code>, <code>col*_value</code></td><td>Fakturainformasjon, ofte leverandørnavn, fakturanummer og bilagsnummer.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Hva kan vi finne ut?</h3>
+      <ul>
+        <li>Hvilke fakturaer som fortsatt har aktive workflowoppgaver.</li>
+        <li>Hvem en oppgave ligger hos nå, via <code>wf_user_id</code> og <code>wf_status = 'ACT'</code>.</li>
+        <li>Hvem som faktisk godkjente eller behandlet et steg, via <code>real_user</code>.</li>
+        <li>Hvor lang tid et steg tok fra distribusjon til handling.</li>
+        <li>Om en faktura er videresendt, avvist, automatisk behandlet eller fullført.</li>
+        <li>Alle steg i samme flyt, ved å gruppere på <code>oid</code>.</li>
+      </ul>
+
+      <h3>Finn aktive workflowoppgaver</h3>
+      <pre><code>SELECT
+  oid,
+  task_id,
+  wf_status,
+  wf_user_id,
+  distr_date,
+  ready_date,
+  col1_descr, col1_value,
+  col2_descr, col2_value,
+  col3_descr, col3_value
+FROM read_parquet('data-ny/2026/awftaskfin.parquet')
+WHERE wf_status = 'ACT'
+ORDER BY distr_date DESC
+LIMIT 100;</code></pre>
+
+      <h3>Finn hvem som behandlet eller godkjente</h3>
+      <pre><code>SELECT
+  oid,
+  task_id,
+  wf_status,
+  action_code,
+  wf_user_id,
+  real_user,
+  orig_user,
+  action_date,
+  col2_descr,
+  col2_value AS fakturanr,
+  col3_descr,
+  col3_value AS bilagsnr
+FROM read_parquet('data-ny/2026/awftaskfin.parquet')
+WHERE wf_status = 'FIN'
+ORDER BY action_date DESC
+LIMIT 100;</code></pre>
+
+      <h3>Mål behandlingstid</h3>
+      <pre><code>WITH wf AS (
+  SELECT
+    oid,
+    task_id,
+    wf_status,
+    wf_user_id,
+    try_strptime(substr(distr_date, 1, 19), '%Y-%m-%dT%H:%M:%S') AS distr_ts,
+    try_strptime(substr(action_date, 1, 19), '%Y-%m-%dT%H:%M:%S') AS action_ts,
+    col2_value AS fakturanr,
+    col3_value AS bilagsnr
+  FROM read_parquet('data-ny/2026/awftaskfin.parquet')
+)
+SELECT
+  oid,
+  task_id,
+  wf_status,
+  wf_user_id,
+  fakturanr,
+  bilagsnr,
+  date_diff('hour', distr_ts, action_ts) AS timer_til_handling
+FROM wf
+WHERE action_ts IS NOT NULL
+  AND distr_ts IS NOT NULL
+ORDER BY timer_til_handling DESC
+LIMIT 50;</code></pre>
+
+      <h3>Se hele flyten for en faktura</h3>
+      <p>
+        I observerte rader er <code>col2_value</code> ofte fakturanummer og <code>col3_value</code> ofte
+        bilagsnummer/flytbilag, men sjekk alltid <code>col*_descr</code> før du konkluderer.
+      </p>
+      <pre><code>SELECT
+  oid,
+  task_id,
+  orig_task_id,
+  wf_status,
+  action_code,
+  wf_user_id,
+  real_user,
+  orig_user,
+  action_date,
+  distr_date,
+  ready_date,
+  col1_descr, col1_value,
+  col2_descr, col2_value,
+  col3_descr, col3_value
+FROM read_parquet('data-ny/2026/awftaskfin.parquet')
+WHERE col2_value = '5520011110026'
+   OR col3_value = '900003892'
+ORDER BY oid, try_cast(task_id AS integer), action_date;</code></pre>
+    </section>
+
+    <section>
+      <h2>Koble workflow mot regnskap</h2>
+      <p>
+        Start med fakturanummer når det finnes. I regnskapstabellen ligger dette ofte i
+        <code>ext_inv_ref</code>. I workflow ligger det ofte i en av <code>col*_value</code>-kolonnene,
+        typisk <code>col2_value</code> når <code>col2_descr = 'Fakturanr'</code>.
+      </p>
+      <pre><code>WITH wf AS (
+  SELECT
+    oid,
+    wf_status,
+    wf_user_id,
+    real_user,
+    action_date,
+    distr_date,
+    col2_value AS fakturanr,
+    col3_value AS workflow_bilagsnr
+  FROM read_parquet('data-ny/2026/awftaskfin.parquet')
+  WHERE col2_descr = 'Fakturanr'
+),
+regnskap AS (
+  SELECT
+    voucher_no,
+    ext_inv_ref,
+    account,
+    dim_1,
+    dim_2,
+    dim_4,
+    amount,
+    description,
+    period
+  FROM read_parquet('data-ny/2026/agltransact.parquet')
+)
+SELECT
+  r.voucher_no,
+  r.ext_inv_ref,
+  r.account,
+  r.dim_1,
+  r.dim_2,
+  r.dim_4,
+  r.amount,
+  r.description,
+  w.oid,
+  w.wf_status,
+  w.wf_user_id,
+  w.real_user,
+  w.action_date
+FROM regnskap r
+LEFT JOIN wf w
+  ON r.ext_inv_ref = w.fakturanr
+WHERE r.ext_inv_ref IS NOT NULL
+LIMIT 100;</code></pre>
+      <p class="warning">
+        Ikke anta at workflow-bilagsnummer alltid er identisk med bokført <code>voucher_no</code>.
+        I fakturaflyt kan det finnes egne kø-/flytbilag. Valider koblinger mot fakturanummer,
+        leverandørtekst, beløp og dato før du trekker konklusjoner.
+      </p>
+    </section>
+
+    <section>
+      <h2>Budsjettdata for 2026</h2>
+      <p>
+        Budsjettverdiene ligger primært i <code>apltransactvalue.parquet</code>, der
+        <code>acc_period</code> er avgrenset til 202601-202612. <code>apltransact.parquet</code>
+        inneholder tilhørende budsjettlinjer, mens <code>aplversion.parquet</code> inneholder relevante
+        versjoner.
+      </p>
+      <pre><code>SELECT
+  acc_period,
+  sum(period_value) AS budsjett
+FROM read_parquet('data-ny/2026/apltransactvalue.parquet')
+GROUP BY acc_period
+ORDER BY acc_period;</code></pre>
+      <p>
+        For analyse på konto og dimensjoner må budsjettverdier normalt kobles mot
+        <code>apltransact</code> på egnet teknisk nøkkel, typisk <code>agrtid</code> eller
+        <code>trans_id</code>, avhengig av hvilken detaljering du trenger.
+      </p>
+    </section>
+
+    <section>
+      <h2>Anbefalt startoppsett i DuckDB</h2>
+      <pre><code>CREATE OR REPLACE VIEW regnskap AS
+SELECT * FROM read_parquet('data-ny/2026/agltransact.parquet');
+
+CREATE OR REPLACE VIEW workflow AS
+SELECT * FROM read_parquet('data-ny/2026/awftaskfin.parquet');
+
+CREATE OR REPLACE VIEW budsjettverdi AS
+SELECT * FROM read_parquet('data-ny/2026/apltransactvalue.parquet');
+
+CREATE OR REPLACE VIEW budsjettlinje AS
+SELECT * FROM read_parquet('data-ny/2026/apltransact.parquet');
+
+SELECT period, account, dim_4, sum(try_cast(amount AS double)) AS regnskap
+FROM regnskap
+GROUP BY period, account, dim_4
+ORDER BY period, account, dim_4;</code></pre>
+    </section>
+  </main>
+</body>
+</html>

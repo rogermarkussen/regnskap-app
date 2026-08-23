@@ -1,0 +1,32 @@
+{
+  "name": "regnskap-oppgave2-kontogruppering",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prepare:data": "uv run python scripts/prepare_data.py",
+    "validate": "uv run python scripts/validate_task2.py",
+    "test:excel": "uv run python -m unittest tests.test_task2_excel_fasit tests.test_task2_grouping_fasit -v",
+    "test:export": "node --test tests/task2_excel_export.test.js",
+    "report": "uv run python scripts/build_task2_comparison_html.py",
+    "sources": "evidence sources --strict",
+    "build:web": "uv run python ../../scripts/clean_static_build.py . && env -u INIT_CWD -u npm_config_local_prefix evidence build:strict",
+    "verify:production": "uv run python ../../scripts/verify_static_build.py oppgave2 . --profile internal",
+    "build": "npm run prepare:data && npm run validate && npm run sources && npm run build:web && npm run verify:production",
+    "refresh": "npm test && npm run sources && npm run build:web && npm run verify:production",
+    "test": "npm run prepare:data && npm run validate && npm run test:excel && npm run test:export",
+    "dev:fast": "env -u INIT_CWD -u npm_config_local_prefix evidence dev --host 0.0.0.0 --port 3001",
+    "preview": "env -u INIT_CWD -u npm_config_local_prefix evidence preview"
+  },
+  "engines": { "node": ">=22 <23" },
+  "type": "module",
+  "dependencies": {
+    "@evidence-dev/core-components": "^5.4.2",
+    "@evidence-dev/duckdb": "^2.0.1",
+    "@evidence-dev/evidence": "^40.1.8",
+    "write-excel-file": "^4.1.1"
+  },
+  "devDependencies": {
+    "fflate": "^0.8.3",
+    "typescript": "5.4.2"
+  }
+}

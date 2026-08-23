@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "rule_version": "2026-08-23",
+  "approval_status": "forelopig_ikke_faglig_godkjent",
+  "report_year": 2026,
+  "budget_version": "2026B",
+  "sections": ["711", "712", "721", "731", "741"],
+  "account_categories": {
+    "Lønnskostnader": [5000, 5999],
+    "Avskrivninger": [6000, 6109],
+    "ADK": [6110, 7834]
+  },
+  "budget_financing": {
+    "by_section": {
+      "212": "154345",
+      "761": "154322+045101"
+    },
+    "default": "154301"
+  },
+  "combined_financing": {
+    "members": ["154322", "045101"],
+    "label": "154322+045101"
+  },
+  "cash_712": {
+    "section": "712",
+    "account": "8720",
+    "financing": "154370",
+    "budget_nok": 0
+  },
+  "workflow_candidates": {
+    "active_status": "ACT",
+    "completed_actions": ["ATTEST", "BDMGOD"],
+    "stale_after_days": 31
+  }
+}

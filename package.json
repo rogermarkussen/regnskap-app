@@ -1,0 +1,24 @@
+{
+  "name": "regnskap-oppgaver",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix oppgave1/kode ci && npm --prefix oppgave2/kode ci && npm --prefix oppgave3 ci",
+    "check:data": "python scripts/validate_data_contract.py",
+    "test:contract": "python -m unittest tests.test_data_contract -v",
+    "dev:fast": "npm --prefix oppgave1/kode run dev:fast",
+    "dev:task1": "npm --prefix oppgave1/kode run dev:fast",
+    "dev:task2": "npm --prefix oppgave2/kode run dev:fast",
+    "dev:task3": "npm --prefix oppgave3 run dev:fast",
+    "refresh:task1": "npm --prefix oppgave1/kode run refresh",
+    "refresh:task2": "npm --prefix oppgave2/kode run refresh",
+    "refresh:task3": "npm --prefix oppgave3 run refresh",
+    "build:task1": "npm --prefix oppgave1/kode run build",
+    "build:task2": "npm --prefix oppgave2/kode run build",
+    "build:task3": "npm --prefix oppgave3 run build",
+    "build:internal": "npm run check:data && npm run build:task1 && npm run build:task2 && npm run build:task3",
+    "build": "npm run build:internal",
+    "test": "npm run check:data && npm run test:contract && npm --prefix oppgave1/kode test && npm --prefix oppgave2/kode test && npm --prefix oppgave3 test"
+  },
+  "engines": { "node": ">=22 <23" }
+}

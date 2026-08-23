@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "2026-08-23",
+  "data_root_env": "REGNSKAP_DATA_ROOT",
+  "datasets": {
+    "common.ledger": {
+      "path": "snapshots/2026-08-23/operative/common/agltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "5337911d32adc020ea0b2c1a715fec3f0726f5673bd4813c2f110374179d08a6"
+    },
+    "common.budget_header": {
+      "path": "snapshots/2026-08-23/operative/common/apltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "eb8cd7c8d6a61315c2c72c3f379bcea2902288f7f385d3db545f00f12d814f05"
+    },
+    "common.budget_values": {
+      "path": "snapshots/2026-08-23/operative/common/apltransactvalue.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "bd52f1bf683f93d2e8cb626c6fc15d7358a1581762b2ef605469d273a08b7e26"
+    },
+    "task1.dimension_values": {
+      "path": "snapshots/2026-08-23/operative/oppgave1/agldimvalue.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "7234ae8c1ad9b4177bd36037d819d6de2540f1a6de1649efda30b9b71e1a3b39"
+    },
+    "task1.enriched_ledger": {
+      "path": "snapshots/2026-08-23/operative/oppgave1/agltransact_beriket.parquet",
+      "format": "parquet",
+      "role": "derived-source",
+      "classification": "confidential",
+      "sha256": "943de7922d3f4f6377e1a811079fc2dd68f837458bf52e3937a7c3ea1a259e71"
+    },
+    "task1.budget_versions": {
+      "path": "snapshots/2026-08-23/operative/oppgave1/aplversion.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "69f2b28ffc3a80f695d83a0495df235786eb0d8760f0d45e671df0018946866d"
+    },
+    "task1.account_plan": {
+      "path": "snapshots/2026-08-23/reference/kontoplan.csv",
+      "format": "csv",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "6c20fe43686400f5765fd581072527f26cb82b0128846400886955261da230f0"
+    },
+    "task2.dashboard_workbook": {
+      "path": "snapshots/2026-08-23/operative/oppgave2/Dashboard - KPIer 19.06.26.xlsx",
+      "format": "xlsx",
+      "role": "operative-temporary",
+      "classification": "confidential",
+      "sha256": "9bda9021fa31576c191e190b2505dfc2e863447db2234cb28113dadbbca9a202"
+    },
+    "task2.raw_transactions_workbook": {
+      "path": "snapshots/2026-08-23/operative/oppgave2/Finansiering 154301_ADK 01-03.xlsx",
+      "format": "xlsx",
+      "role": "operative-temporary",
+      "classification": "confidential",
+      "sha256": "b14256800f2f60515d22404047670e4683e7f3dd58e71fc1f88bade8c5e109c5"
+    },
+    "task2.account_grouping_workbook": {
+      "path": "snapshots/2026-08-23/operative/oppgave2/Kontogruppering 17.06.26.xlsx",
+      "format": "xlsx",
+      "role": "operative-temporary",
+      "classification": "internal",
+      "sha256": "16eb75739abb824ad8bcd5255ed0438ec49b8e06635d0c69f7eaf67d4b28bd5f"
+    },
+    "task3.workflow": {
+      "path": "snapshots/2026-08-23/operative/oppgave3/awftaskfin.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "restricted",
+      "sha256": "5166fc6cf74d0e2574bc3da28e4665706cda320604f983fd35668789e16bc84d"
+    },
+    "task3.monthly_close_template": {
+      "path": "snapshots/2026-08-23/templates/Ønsket mal_mnds avsl.xlsx",
+      "format": "xlsx",
+      "role": "template",
+      "classification": "internal",
+      "sha256": "961e9c779db80954c7ee8b5ba5460d9391d40a79df724130e52e0c37741252ea"
+    },
+    "fasit.dashboard_kpi": {
+      "path": "snapshots/2026-08-23/fasit/Dashboard - KPIer 19.06.26.xlsx",
+      "format": "xlsx",
+      "role": "fasit",
+      "classification": "confidential",
+      "sha256": "0b13e41edff5abbbbb361ffb16629042af4750a3e195ed6d24f470bbd688154e"
+    },
+    "fasit.account_grouping_layout": {
+      "path": "snapshots/2026-08-23/fasit/Kontogruppering 17.06.26.xlsx",
+      "format": "xlsx",
+      "role": "fasit",
+      "classification": "confidential",
+      "sha256": "b1dfb47a706fdb73d6316df3a981c896f6a1f7d26426a6e391f4ca197ac6cd76"
+    },
+    "fasit.account_grouping_154301": {
+      "path": "snapshots/2026-08-23/fasit/Kontogruppering med tall 18.06.26 (finansiering 154301).xlsx",
+      "format": "xlsx",
+      "role": "fasit",
+      "classification": "confidential",
+      "sha256": "4a2f01a2faac06fcec83f1ee38c401cda3d21c2ffbaa5177443584eaa41ca740"
+    },
+    "fasit.account_grouping_all": {
+      "path": "snapshots/2026-08-23/fasit/Kontogruppering med tall 18.06.26 (finansiering ALLE).xlsx",
+      "format": "xlsx",
+      "role": "fasit",
+      "classification": "confidential",
+      "sha256": "4ba68c95f08d1621d1bc1ff661e348cf1a9395f8933e6e7540a94429a56e088e"
+    }
+  }
+}
