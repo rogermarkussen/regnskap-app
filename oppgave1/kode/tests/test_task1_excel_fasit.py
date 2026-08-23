@@ -385,9 +385,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
             & (self.calculated["finansiering"] == "154301")
             & (self.calculated["metric"] == "ADK")
         ]
-        total = float(adk[adk["section_code"] == "all"]["hovedbok_nok1000"].iloc[0])
-        sections = float(adk[adk["section_code"] != "all"]["hovedbok_nok1000"].sum())
-        self.assertAlmostEqual(total, sections, places=9)
+        for field in ("hovedbok_nok1000", "budsjett_nok1000"):
+            total = float(adk[adk["section_code"] == "all"][field].iloc[0])
+            sections = float(adk[adk["section_code"] != "all"][field].sum())
+            self.assertAlmostEqual(total, sections, places=9, msg=field)
 
 
 if __name__ == "__main__":

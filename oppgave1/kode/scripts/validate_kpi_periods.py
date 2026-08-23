@@ -38,8 +38,10 @@ def main() -> None:
     section_reconciliation = connection.execute(
         """
         select
-          max(hovedbok_nok1000) filter (where section_code = 'all') as total,
-          sum(hovedbok_nok1000) filter (where section_code <> 'all') as seksjonssum
+          max(hovedbok_nok1000) filter (where section_code = 'all') as hovedbok_total,
+          sum(hovedbok_nok1000) filter (where section_code <> 'all') as hovedbok_seksjonssum,
+          max(budsjett_nok1000) filter (where section_code = 'all') as budsjett_total,
+          sum(budsjett_nok1000) filter (where section_code <> 'all') as budsjett_seksjonssum
         from dashboard_kpi_calculated
         where period_key = 'p1_6'
           and finansiering = '154301'
@@ -70,7 +72,12 @@ def main() -> None:
     close(
         float(section_reconciliation[1]),
         float(section_reconciliation[0]),
-        "Seksjonssum mot samla ADK",
+        "Seksjonssum mot samla ADK-hovudbok",
+    )
+    close(
+        float(section_reconciliation[3]),
+        float(section_reconciliation[2]),
+        "Seksjonssum mot samla ADK-budsjett",
     )
 
     adk = rows[(rows.period_key == "p1_3") & (rows.tittel == "ADK")].iloc[0]
