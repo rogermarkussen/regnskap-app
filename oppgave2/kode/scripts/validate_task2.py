@@ -82,24 +82,55 @@ def validate_multiyear_parquet_report() -> bool:
             from generated cross join source
             """
         ).fetchone()
+        missing_budget_rows, invalid_missing_budget_rows = conn.execute(
+            f"""
+            select
+              count(*) filter (
+                where virksomhet_budsjett_tusen is null
+                  and aarets_budsjett_tusen is null
+                  and avvik_tusen is null
+              ),
+              count(*) filter (
+                where virksomhet_budsjett_tusen is null
+                  and avvik_tusen is not null
+              )
+            from read_parquet('{ROWS_PARQUET.as_posix()}')
+            where section_code = 'all'
+              and finansiering = 'alle'
+              and report_year = 2026
+              and rapportperiode = (
+                select max(rapportperiode)
+                from read_parquet('{ROWS_PARQUET.as_posix()}')
+                where report_year = 2026
+              )
+              and row_type = 'account'
+              and abs(hovedbok_tusen) > 0.00001
+            """
+        ).fetchone()
     finally:
         conn.close()
 
     min_period, max_period, years, financings, accounts, cash_rows, budget_2025 = coverage
     if (min_period, max_period, years) != ("202401", "202608", 3):
         raise SystemExit(
-            f"Uventa periode-/årsdekning: {min_period}–{max_period}, {years} år"
+            f"Uventet periode-/årsdekning: {min_period}–{max_period}, {years} år"
         )
     if financings != 4 or accounts == 0:
-        raise SystemExit("Fleirårsrapporten manglar finansieringsval eller kontorader")
+        raise SystemExit("Flerårsrapporten mangler finansieringsvalg eller kontorader")
     if cash_rows == 0 or section_cash_rows == 0:
-        raise SystemExit("Kontantrekneskapen manglar for alle-syn eller seksjonar")
+        raise SystemExit("Kontantregnskapet mangler for samlet visning eller seksjoner")
     if budget_2025 == 0:
-        raise SystemExit("2025-budsjettet er tomt; amount1 er ikkje lese")
+        raise SystemExit("2025-budsjettet er tomt; amount1 er ikke lest")
     if errors:
         raise SystemExit(f"Datakontroll feilet med {errors} feil")
     if cash_reconciliation is None or cash_reconciliation[0] > 0.000001:
-        raise SystemExit("Kontantrekneskapen avstemmer ikkje mot pay_period i acatrans")
+        raise SystemExit("Kontantregnskapet avstemmer ikke mot pay_period i acatrans")
+    if missing_budget_rows == 0:
+        raise SystemExit(
+            "Rapporten skiller ikke manglende 2026-budsjett fra eksplisitt null"
+        )
+    if invalid_missing_budget_rows:
+        raise SystemExit("Rapporten beregner avvik uten budsjettgrunnlag")
     print(
         f"Oppgave 2-validering bestått: {min_period}–{max_period}, "
         f"{accounts} kontorader og {cash_rows + section_cash_rows} kontantrader"

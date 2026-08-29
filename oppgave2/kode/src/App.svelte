@@ -3,6 +3,7 @@
   import { compressors } from 'hyparquet-compressors';
   import writeExcelFile from 'write-excel-file/browser';
   import {
+    budgetMonthValue,
     displayLabel,
     filterReportRows,
     reportTotals,
@@ -35,7 +36,7 @@
   let dataFolderName = '';
   let rows = [];
   let sections = [];
-  let budgetVersion = '2026B';
+  let budgetVersion = '';
   let selectedYear = 2026;
   let financing = '154301';
   let reportPeriod = 'latest';
@@ -126,7 +127,7 @@
         ...Object.fromEntries(
           monthOptions.map(({ month, exportLabel }) => [
             exportLabel,
-            row[`budsjett_${String(month).padStart(2, '0')}_tusen`]
+            budgetMonthValue(row, month)
           ])
         ),
         'Totalt alle måneder': row.aarets_budsjett_tusen
@@ -196,7 +197,6 @@
           section_sort: Number(row.section_sort)
         };
       });
-      budgetVersion = String(rows[0]?.budsjettversjon ?? budgetVersion);
       dataFolderName = selection.folderName;
       dataReady = true;
       sections = [...new Map(
@@ -249,6 +249,16 @@
     reportPeriod: effectivePeriod,
     sectionCode
   });
+  $: budgetVersion = String(
+    hierarchicalRows[0]?.budsjettversjon ?? `${selectedYear}B`
+  );
+  $: incompleteBudgetAccounts = hierarchicalRows.filter(
+    (row) =>
+      row.row_type === 'account' &&
+      Number(row.hovedbok_tusen) !== 0 &&
+      (row.virksomhet_budsjett_tusen === null || row.virksomhet_budsjett_tusen === undefined)
+  );
+  $: budgetIsIncomplete = incompleteBudgetAccounts.length > 0;
   $: ({ grandTotal: total, summaryRows, mainGroups, groupKeys } = reportTotals(hierarchicalRows));
   $: filteredRows = filterReportRows(hierarchicalRows, {
     mainGroup,
@@ -335,7 +345,7 @@
           <label>
             <span>Til og med</span>
             <select bind:value={reportPeriod} on:change={resetDrilldown}>
-              <option value="latest">Nyaste tilgjengelege månad</option>
+              <option value="latest">Nyeste tilgjengelige måned</option>
               {#each periodOptions as option}<option value={option.value}>{option.label}</option>{/each}
             </select>
           </label>
@@ -380,13 +390,13 @@
         <span>Hovedbok</span><strong>{number(total.hovedbok_tusen)}</strong><small>Akkumulert {periodText}</small>
       </article>
       <article>
-        <span>Budsjett</span><strong>{number(total.virksomhet_budsjett_tusen)}</strong><small>Akkumulert {periodText}</small>
+        <span>Budsjett</span><strong>{number(total.virksomhet_budsjett_tusen)}</strong><small>{budgetIsIncomplete ? 'Sum av tilgjengelige budsjettposter' : `Akkumulert ${periodText}`}</small>
       </article>
       <article class:negative={Number(total.avvik_tusen) < 0}>
-        <span>Avvik</span><strong>{number(total.avvik_tusen)}</strong><small>Budsjett minus hovedbok</small>
+        <span>Avvik</span><strong>{number(total.avvik_tusen)}</strong><small>{budgetIsIncomplete ? 'Kan ikke beregnes for hele utvalget' : 'Budsjett minus hovedbok'}</small>
       </article>
       <article>
-        <span>Forbruk</span><strong>{percent(total.forbruk_av_aarets_budsjett)}</strong><small>Av årsbudsjettet</small>
+        <span>Forbruk</span><strong>{percent(total.forbruk_av_aarets_budsjett)}</strong><small>{budgetIsIncomplete ? 'Kan ikke beregnes for hele utvalget' : 'Av årsbudsjettet'}</small>
       </article>
     </section>
 
@@ -461,6 +471,10 @@
         {/if}
       </div>
 
+      {#if view === 'virksomhet' && budgetIsIncomplete}
+        <p class="source-warning">Budsjett {budgetVersion} mangler poster for {incompleteBudgetAccounts.length} kontoer som har hovedbokstall. Budsjett, avvik og forbruk vises som tomme verdier der sammenligningsgrunnlaget mangler.</p>
+      {/if}
+
       {#if view === 'kontant' && sectionCode !== 'all'}
         <p class="source-warning">Kontantkilden har ikke en pålitelig seksjonsfordeling. Kontantverdier vises derfor ikke når en seksjon er valgt.</p>
       {:else if view === 'kontant' && (total.kontant_tusen === null || total.kontant_tusen === undefined)}
@@ -502,7 +516,7 @@
                 {:else if view === 'kontant'}
                   <td>{number(row.kontant_budsjett_tusen)}</td><td>{number(row.kontant_tusen)}</td><td class:bad={Number(row.kontant_avvik_tusen) < 0}>{number(row.kontant_avvik_tusen)}</td>
                 {:else}
-                  {#each monthOptions as month}<td>{number(row[`budsjett_${month.period}_tusen`])}</td>{/each}<td class="month-total">{number(row.aarets_budsjett_tusen)}</td>
+                  {#each monthOptions as month}<td>{number(budgetMonthValue(row, month.month))}</td>{/each}<td class="month-total">{number(row.aarets_budsjett_tusen)}</td>
                 {/if}
               </tr>
             {/each}

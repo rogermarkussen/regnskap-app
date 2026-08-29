@@ -1,6 +1,9 @@
 export const displayLabel = (value) =>
   String(value ?? '').replace(/\s*\(\s*\d{4}(?:\s*,\s*\d{4})*\s*\)\s*$/, '');
 
+export const budgetMonthValue = (row, month) =>
+  row[`budsjett_${String(month).padStart(2, '0')}_tusen`];
+
 export const selectReportRows = (
   rows,
   { financing, reportPeriod, sectionCode }
@@ -65,7 +68,19 @@ export const reportTotals = (rows) => {
     avvik_tusen: sum('avvik_tusen'),
     aarets_budsjett_tusen: sum('aarets_budsjett_tusen')
   };
-  calculated.forbruk_av_aarets_budsjett = calculated.aarets_budsjett_tusen
+  const periodComparisonIncomplete = accountRows.some(
+    (row) =>
+      Number(row.hovedbok_tusen) !== 0 &&
+      (row.virksomhet_budsjett_tusen === null || row.virksomhet_budsjett_tusen === undefined)
+  );
+  const annualComparisonIncomplete = accountRows.some(
+    (row) =>
+      Number(row.hovedbok_tusen) !== 0 &&
+      (row.aarets_budsjett_tusen === null || row.aarets_budsjett_tusen === undefined)
+  );
+  if (periodComparisonIncomplete) calculated.avvik_tusen = null;
+  calculated.forbruk_av_aarets_budsjett =
+    !annualComparisonIncomplete && calculated.aarets_budsjett_tusen
     ? calculated.hovedbok_tusen / calculated.aarets_budsjett_tusen
     : null;
   return {

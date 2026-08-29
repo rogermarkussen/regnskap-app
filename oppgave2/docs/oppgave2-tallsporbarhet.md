@@ -120,6 +120,13 @@ Hvis en konto eller kontantverdi mangler i kilden, beholdes den som tom verdi
 og kontantavvik beregnes ikke. Rapporten viser tom verdi som `–`; manglende
 kontantgrunnlag skal aldri erstattes med et konstruert nullbudsjett.
 
+Det samme gjelder virksomhetsbudsjettet fra Parquet. En eksplisitt nullpost
+beholdes som `0`, mens en konto uten budsjettpost vises som `–`. Rapporten
+beregner ikke avvik eller forbruk når hovedbokskontoen mangler budsjettgrunnlag.
+I `2026B` finnes budsjettposter bare i kontoklasse 5, 6 og 7. Inntekter i
+kontoklasse 3 og finansposter i kontoklasse 8 har derfor tomt budsjettgrunnlag,
+ikke nullbudsjett.
+
 ## Kjøring
 
 Kommandoene under kjøres fra `oppgave2/kode/`.

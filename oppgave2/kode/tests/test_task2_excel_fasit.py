@@ -195,6 +195,54 @@ class Task2ReportPeriodTest(unittest.TestCase):
         self.assertEqual(mismatches, 0)
         self.assertEqual(non_investment_values, 0)
 
+    def test_missing_budget_source_is_not_published_as_zero(self) -> None:
+        rows_path = (
+            CONTRACT.generated_dir("oppgave2")
+            / "static-app"
+            / "grouped_finance_rows.parquet"
+        )
+        connection = duckdb.connect()
+        try:
+            columns = {
+                row[0]
+                for row in connection.execute(
+                    f"describe select * from read_parquet('{rows_path.as_posix()}')"
+                ).fetchall()
+            }
+            if "report_year" not in columns:
+                self.skipTest("Kontrollen gjelder den flerårige Parquet-rapporten")
+
+            source_rows = connection.execute(
+                f"""
+                select count(*)
+                from read_parquet('{BUDGET_HEADER_PATH.as_posix()}') h
+                join read_parquet('{BUDGET_VALUE_PATH.as_posix()}') v using (trans_id)
+                where h.version = '2026B'
+                  and trim(h.account) = '3710'
+                  and try_cast(v.period as integer) between 202601 and 202612
+                """
+            ).fetchone()[0]
+            report_row = connection.execute(
+                f"""
+                select
+                  virksomhet_budsjett_tusen,
+                  aarets_budsjett_tusen,
+                  avvik_tusen
+                from read_parquet('{rows_path.as_posix()}')
+                where section_code = 'all'
+                  and finansiering = 'alle'
+                  and rapportperiode = '202608'
+                  and row_type = 'account'
+                  and konto = '3710'
+                """
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertEqual(source_rows, 0)
+        self.assertIsNotNone(report_row)
+        self.assertEqual(report_row, (None, None, None))
+
 
 def _account_rows(worksheet):
     for row_number in range(1, worksheet.max_row + 1):

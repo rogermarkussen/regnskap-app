@@ -110,7 +110,7 @@ def _expanded_values(
               and try_cast(account as integer) between 3000 and 8999
         """
     else:
-        raise ValueError(f"Ukjent kjelde: {source}")
+        raise ValueError(f"Ukjent kilde: {source}")
 
     return conn.execute(
         f"""
@@ -239,18 +239,37 @@ def _summed_values(rows: list[dict[str, object]], columns: list[str]) -> dict[st
     for column in columns:
         values = [float(row[column]) for row in rows if row.get(column) is not None]
         result[column] = sum(values) if values else None
+    missing_period_budget = any(
+        row.get("virksomhet_budsjett_tusen") is None
+        and row.get("hovedbok_tusen") not in (None, 0, 0.0)
+        for row in rows
+    )
+    missing_annual_budget = any(
+        row.get("aarets_budsjett_tusen") is None
+        and row.get("hovedbok_tusen") not in (None, 0, 0.0)
+        for row in rows
+    )
+    if missing_period_budget:
+        result["avvik_tusen"] = None
     annual = result.get("aarets_budsjett_tusen")
     actual = result.get("hovedbok_tusen")
     result["forbruk_av_aarets_budsjett"] = (
-        None if annual in (None, 0) or actual is None else actual / annual
+        None
+        if missing_annual_budget or annual in (None, 0) or actual is None
+        else actual / annual
     )
     return result
+
+
+def _sum_available(values: list[float | None]) -> float | None:
+    present = [float(value) for value in values if value is not None]
+    return sum(present) if present else None
 
 
 def build_parquet_report(
     sources: ParquetReportSources,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Returner kontoplan, rapport og kjeldekontroll for alle tilgjengelege periodar."""
+    """Returner kontoplan, rapport og kildekontroll for alle tilgjengelige perioder."""
     conn = duckdb.connect()
     try:
         actual = _expanded_values(conn, sources, "actual")
@@ -317,8 +336,7 @@ def build_parquet_report(
                     number = str(account["konto"])
                     monthly = {
                         f"budsjett_{month:02d}_tusen": budget_map.get(
-                            (section_code, financing, number, f"{year}{month:02d}"),
-                            0.0,
+                            (section_code, financing, number, f"{year}{month:02d}")
                         )
                         for month in range(1, 13)
                     }
@@ -337,20 +355,28 @@ def build_parquet_report(
                     ]
                     present_cash = [value for value in cash_month_values if value is not None]
                     cash_value = sum(present_cash) if present_cash else None
-                    period_budget = sum(
-                        monthly[f"budsjett_{month:02d}_tusen"]
-                        for month in range(1, end_month + 1)
+                    period_budget = _sum_available(
+                        [
+                            monthly[f"budsjett_{month:02d}_tusen"]
+                            for month in range(1, end_month + 1)
+                        ]
                     )
-                    annual_budget = sum(monthly.values())
+                    annual_budget = _sum_available(list(monthly.values()))
                     investment_budget = None
                     investment_actual = None
                     if financing in {"154345", "alle"}:
-                        investment_budget = sum(
-                            budget_map.get(
-                                (section_code, "154345", number, f"{year}{month:02d}"),
-                                0.0,
-                            )
-                            for month in range(1, end_month + 1)
+                        investment_budget = _sum_available(
+                            [
+                                budget_map.get(
+                                    (
+                                        section_code,
+                                        "154345",
+                                        number,
+                                        f"{year}{month:02d}",
+                                    )
+                                )
+                                for month in range(1, end_month + 1)
+                            ]
                         )
                         investment_actual = sum(
                             actual_map.get(
@@ -360,8 +386,9 @@ def build_parquet_report(
                             for month in range(1, end_month + 1)
                         )
                     has_data = any(
-                        abs(value) > 1e-12
-                        for value in [actual_value, period_budget, annual_budget, cash_value or 0.0]
+                        abs(float(value)) > 1e-12
+                        for value in [actual_value, *monthly.values(), cash_value]
+                        if value is not None
                     )
                     if not has_data:
                         continue
@@ -379,10 +406,16 @@ def build_parquet_report(
                         "radtekst": f"{number} - {account['konto_navn']}",
                         "konto": number,
                         "konto_navn": account["konto_navn"],
-                        "data_status": "Operative tall",
+                        "data_status": (
+                            "Budsjettgrunnlag mangler"
+                            if period_budget is None and actual_value != 0
+                            else "Operative tall"
+                        ),
                         "virksomhet_budsjett_tusen": period_budget,
                         "hovedbok_tusen": actual_value,
-                        "avvik_tusen": period_budget - actual_value,
+                        "avvik_tusen": (
+                            None if period_budget is None else period_budget - actual_value
+                        ),
                         "aarets_budsjett_tusen": annual_budget,
                         **monthly,
                         "kontant_budsjett_tusen": None,
@@ -391,7 +424,9 @@ def build_parquet_report(
                         "investeringsbudsjett_tusen": investment_budget,
                         "investeringsregnskap_tusen": investment_actual,
                         "forbruk_av_aarets_budsjett": (
-                            None if annual_budget == 0 else actual_value / annual_budget
+                            None
+                            if annual_budget in (None, 0)
+                            else actual_value / annual_budget
                         ),
                         "source_file": (
                             f"{sources.ledger.name}; {sources.budget_header.name}; "
@@ -495,29 +530,29 @@ def build_parquet_report(
                 "kontroll": "Årsdekning",
                 "status": "ok" if len({period[:4] for period in periods}) >= 3 else "warning",
                 "antall_avvik": 0 if len({period[:4] for period in periods}) >= 3 else 1,
-                "detalj": f"Periodar frå {periods[0]} til {periods[-1]}.",
+                "detalj": f"Perioder fra {periods[0]} til {periods[-1]}.",
             },
             {
-                "kontroll": "Kontantkontoar",
+                "kontroll": "Kontantkontoer",
                 "status": "ok" if invalid_cash_accounts == 0 else "error",
                 "antall_avvik": int(invalid_cash_accounts),
-                "detalj": "Alle kontantkontoar er funne i acaaccounts."
+                "detalj": "Alle kontantkontoer finnes i acaaccounts."
                 if invalid_cash_accounts == 0
-                else f"{invalid_cash_accounts} kontantkontoar manglar i acaaccounts.",
+                else f"{invalid_cash_accounts} kontantkontoer mangler i acaaccounts.",
             },
             {
                 "kontroll": "Kontantperiode",
                 "status": "ok" if not cash.empty else "error",
                 "antall_avvik": 0 if not cash.empty else 1,
-                "detalj": "Kontantrekneskapen bruker pay_period frå acatrans.",
+                "detalj": "Kontantregnskapet bruker pay_period fra acatrans.",
             },
             {
                 "kontroll": "Kontantbudsjett",
                 "status": "warning",
                 "antall_avvik": 1,
                 "detalj": (
-                    "Mappa har operativt kontantrekneskap, men inga eiga kjelde for "
-                    "periodisert kontantbudsjett. Feltet blir derfor halde tomt."
+                    "Mappen har operativt kontantregnskap, men ingen egen kilde for "
+                    "periodisert kontantbudsjett. Feltet holdes derfor tomt."
                 ),
             },
         ]
