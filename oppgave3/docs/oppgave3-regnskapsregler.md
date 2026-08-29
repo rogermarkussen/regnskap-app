@@ -28,7 +28,8 @@ De viktigste avklaringene er:
 | Regnskapskilde | `data-ny/2026/agltransact.parquet` | Operativt snapshot | Teknisk etablert |
 | Budsjettkilde | `data/apltransact.parquet` koblet med `data/apltransactvalue.parquet` | Lokalt snapshot | Teknisk etablert |
 | Budsjettversjon | Bare `2026B` | Prosjektets tidligere reproduksjon mot Excel | Må godkjennes for månedsavslutning |
-| Seksjoner | `711`, `712`, `721`, `731`, `741` | Mottatt Excel-mal | Må bekreftes som komplett omfang |
+| Seksjoner i web | Alle reelle seksjoner med hovedbok- eller budsjettdata; `999` utelates | Operative kilder | Teknisk etablert |
+| Seksjoner i Excel-mal | `711`, `712`, `721`, `731`, `741` | Mottatt Excel-mal | Må bekreftes som komplett Excel-omfang |
 | Avsluttet periode | Siste periode med lønnsposteringer og transaksjonsdato til månedsslutt | Teknisk regel i `monthly_close_data.py` | Må godkjennes som periodelås |
 | Lønn | Konto `5000–5999` | Prosjektets eksisterende kontoregel | Må godkjennes |
 | Avskrivninger | Konto `6000–6109` | Avstemt mot Excel-fasit | Teknisk avstemt |
@@ -132,9 +133,12 @@ Områdene skal ikke fylles automatisk før økonomi leverer minst:
 
 Dagens utvalg tar med workflowflyter som ikke finnes som `ext_inv_ref` i
 hovedboken, har minst én `ACT`-oppgave og siste handling `ATTEST` eller
-`BDMGOD`. Statuskartleggingen viser at de to handlingene ligger på fullførte
+`BDMGOD`. Bare poster med en registrert handling de siste 31 dagene vises i
+arbeidslisten. Eldre poster beholdes som historisk kontrollgrunnlag.
+Statuskartleggingen viser at de to handlingene ligger på fullførte
 `FIN`-oppgaver. Utvalget er derfor bare en kontrolliste, ikke et godkjent
-avsetningsgrunnlag.
+avsetningsgrunnlag. Workflowbeløp legges ikke til ADK eller andre
+regnskapstall.
 
 Før fakturabeløp legges til ADK må økonomi og workfloweier godkjenne:
 

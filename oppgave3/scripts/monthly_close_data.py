@@ -195,8 +195,21 @@ def _summary_frame(
         [year_start, period],
     ).df()
 
+    report_sections = sorted(
+        {
+            str(value).strip()
+            for value in pd.concat([actual["seksjon"], budget["seksjon"]], ignore_index=True)
+            .dropna()
+            .tolist()
+            if str(value).strip().isdigit()
+            and len(str(value).strip()) == 3
+            and str(value).strip() != "999"
+        }
+        | set(SECTIONS)
+    )
+
     def aggregate_scope(frame: pd.DataFrame, value_name: str) -> pd.DataFrame:
-        section_rows = frame[frame["seksjon"].isin(SECTIONS)].copy()
+        section_rows = frame[frame["seksjon"].isin(report_sections)].copy()
         section_rows["omfang"] = "Seksjon"
         section_rows["omfang_id"] = section_rows["seksjon"]
         nkom_rows = frame.copy()
@@ -446,13 +459,26 @@ def _invoice_frame(
           nullif(regexp_extract(p.dimensjoner, 'C1=([^;]+)', 1), '') as seksjon,
           nullif(regexp_extract(p.dimensjoner, 'B0=([^;]+)', 1), '') as prosjektnr,
           nullif(regexp_extract(p.dimensjoner, 'R00=([^;]+)', 1), '') as finansiering,
-          'Kandidat til kontroll' as maanedsavslutningsstatus,
-          'Ikke bokført i snapshot; har ACT-oppgave; siste fullførte handling er '
-            || p.siste_handling as statusgrunnlag,
+          case
+            when date_diff('day', cast(p.siste_handling_tid as date), cast(? as date))
+              between 0 and {RULES.workflow_candidates.stale_after_days}
+              then 'Aktuell kandidat'
+            else 'Historisk workflowpost'
+          end as maanedsavslutningsstatus,
+          case
+            when date_diff('day', cast(p.siste_handling_tid as date), cast(? as date))
+              between 0 and {RULES.workflow_candidates.stale_after_days}
+              then 'Ikke bokført i snapshot; har ACT-oppgave; siste fullførte handling er '
+                || p.siste_handling
+            else 'Holdt utenfor arbeidslisten: siste registrerte handling er eldre enn '
+                || {RULES.workflow_candidates.stale_after_days} || ' dager; ACT-statusen må bekreftes mot fakturasystemet'
+          end as statusgrunnlag,
           p.siste_handling,
           p.siste_handling_tid,
           p.aktive_oppgaver,
           date_diff('day', cast(p.siste_handling_tid as date), cast(? as date)) as alder_dager,
+          date_diff('day', cast(p.siste_handling_tid as date), cast(? as date))
+            between 0 and {RULES.workflow_candidates.stale_after_days} as er_aktuell,
           'Ikke bokført i mottatt hovedbokssnapshot' as bokforingskontroll
         from per_flow p
         left join ledger l using (fakturanr)
@@ -461,7 +487,7 @@ def _invoice_frame(
           and p.siste_handling in ({completed_actions})
         order by p.siste_handling_tid desc, p.fakturanr
         """,
-        [snapshot],
+        [snapshot, snapshot, snapshot, snapshot],
     ).df()
     return invoices, pd.Timestamp(snapshot) if snapshot else None
 
@@ -733,6 +759,7 @@ def _add_draft_sheet(wb, invoices: pd.DataFrame, snapshot: pd.Timestamp | None) 
             "Beløp",
             "Siste handling",
             "Alder dager",
+            "Aktualitet",
             "Bokføringskontroll",
         ]
     )
@@ -750,6 +777,7 @@ def _add_draft_sheet(wb, invoices: pd.DataFrame, snapshot: pd.Timestamp | None) 
                 row.belop_nok,
                 row.siste_handling_tid,
                 row.alder_dager,
+                row.maanedsavslutningsstatus,
                 row.bokforingskontroll,
             ]
         )
@@ -757,7 +785,7 @@ def _add_draft_sheet(wb, invoices: pd.DataFrame, snapshot: pd.Timestamp | None) 
     ws["M1"] = "Workflow-snapshot"
     ws["N1"] = None if snapshot is None else snapshot.to_pydatetime()
     ws.freeze_panes = "A3"
-    ws.auto_filter.ref = f"A2:L{max(2, ws.max_row)}"
+    ws.auto_filter.ref = f"A2:M{max(2, ws.max_row)}"
 
 
 def _add_cash_712_detail_sheet(wb, root: Path, period: str) -> None:
@@ -836,6 +864,7 @@ def _fill_workbook(
     output = output_dir / f"manedsavslutning_{period[:4]}-{period[4:]}.xlsx"
 
     wb = load_workbook(template)
+    current_invoices = invoices[invoices["er_aktuell"].fillna(False)].copy()
     current_name = MONTH_NAMES[int(period[4:])]
     previous_name = MONTH_NAMES[int(period[4:]) - 1] if int(period[4:]) > 1 else "Desember"
 
@@ -863,7 +892,7 @@ def _fill_workbook(
             previous_cols,
             rows,
         )
-        _fill_invoice_rows(ws, invoices, section)
+        _fill_invoice_rows(ws, current_invoices, section)
 
     # Remove dated example comments from the supplied template. They must not be
     # mistaken for current-month facts.
@@ -1003,10 +1032,12 @@ def _fill_workbook(
             summary, section, "154301", "Avskrivninger", "hovedbok_maaned_nok"
         )
         adk = _lookup(summary, section, "154301", "ADK", "hovedbok_maaned_nok")
-        invoice_total = invoices.loc[
-            invoices["seksjon"] == section, "belop_nok"
+        invoice_total = current_invoices.loc[
+            current_invoices["seksjon"] == section, "belop_nok"
         ].sum(min_count=1)
         invoice_total = 0.0 if pd.isna(invoice_total) else float(invoice_total)
+        if not RULES.workflow_candidates.include_amounts_in_calculations:
+            invoice_total = 0.0
         adjusted_adk = None if adk is None else adk + invoice_total
         adjusted_total = _sum_if_complete(salary, depreciation, adjusted_adk)
         post_accrual[section] = (salary, adjusted_adk, adjusted_total)
@@ -1091,22 +1122,26 @@ def build_monthly_close(root: Path) -> MonthlyCloseResult:
         conn.close()
 
     workbook_path = _fill_workbook(root, latest_summary, invoices, period, snapshot)
+    current_invoices = invoices[invoices["er_aktuell"].fillna(False)]
     missing_dimensions = int(
-        invoices[["konto", "seksjon", "finansiering"]].isna().any(axis=1).sum()
+        current_invoices[["konto", "seksjon", "finansiering"]]
+        .isna()
+        .any(axis=1)
+        .sum()
     )
     stale_days = RULES.workflow_candidates.stale_after_days
-    stale_invoices = int((invoices["alder_dager"].fillna(0) > stale_days).sum())
+    stale_invoices = int((~invoices["er_aktuell"].fillna(False)).sum())
     actions_text = " eller ".join(RULES.workflow_candidates.completed_actions)
     validations = pd.DataFrame(
         [
             {"kontroll": "Aktuell periode", "status": "ok", "antall": 1, "detalj": f"Siste hovedboksperiode er {period}."},
             {"kontroll": "Seksjoner i mal", "status": "ok", "antall": len(SECTIONS), "detalj": f"Malen dekker {', '.join(SECTIONS)}."},
             {"kontroll": "Budsjettversjon", "status": "ok", "antall": len({str(value) for value in summary['budsjettversjon']}), "detalj": f"Opprinnelig budsjett per rapportår er brukt ({summary['budsjettversjon'].min()}–{summary['budsjettversjon'].max()})."},
-            {"kontroll": "Kandidater til fakturakontroll", "status": "warning" if len(invoices) else "ok", "antall": len(invoices), "detalj": f"Ikke bokført i snapshot, har {RULES.workflow_candidates.active_status}-oppgave og siste fullførte handling {actions_text}. Endelig fakturastatus må godkjennes."},
+            {"kontroll": "Aktuelle kandidater til fakturakontroll", "status": "warning" if len(current_invoices) else "ok", "antall": len(current_invoices), "detalj": f"Ikke bokført i snapshot, har {RULES.workflow_candidates.active_status}-oppgave, siste fullførte handling {actions_text} og er høyst {stale_days} dager gammel. Endelig fakturastatus må godkjennes."},
             {"kontroll": "Manglende fakturadimensjoner", "status": "warning" if missing_dimensions else "ok", "antall": missing_dimensions, "detalj": "Konto, seksjon og finansiering leses fra workflow-loggen."},
-            {"kontroll": "Gamle workflowposter", "status": "warning" if stale_invoices else "ok", "antall": stale_invoices, "detalj": f"Poster eldre enn {stale_days} dager må bekreftes mot fakturasystemet."},
+            {"kontroll": "Historiske workflowposter", "status": "warning" if stale_invoices else "ok", "antall": stale_invoices, "detalj": f"Poster eldre enn {stale_days} dager holdes utenfor arbeidslisten og må bekreftes mot fakturasystemet."},
             {"kontroll": f"Kontantgrunnlag seksjon {RULES.cash.section}", "status": "ok" if sources.cash_ledger else "warning", "antall": len(latest_summary[(latest_summary["omfang"] == "Seksjon") & (latest_summary["omfang_id"] == RULES.cash.section)]), "detalj": f"Konto {RULES.cash.account} / finansiering {RULES.cash.financing} er periodisert med pay_period i acatrans." if sources.cash_ledger else f"Konto {RULES.cash.account} / finansiering {RULES.cash.financing} er brukt foreløpig og må bekreftes som riktig kontantgrunnlag."},
-            {"kontroll": "Bilagsautomatisering", "status": "warning", "antall": len(invoices), "detalj": "Kun kontrollutkast genereres. Ingen import- eller bokføringsfil godkjennes automatisk."},
+            {"kontroll": "Beløp fra workflow", "status": "warning", "antall": len(current_invoices), "detalj": "Workflowbeløp påvirker ikke beregnede regnskapstall. Regelen er ikke faglig godkjent."},
         ]
     )
     return MonthlyCloseResult(summary, invoices, validations, period, workbook_path)
@@ -1116,4 +1151,5 @@ if __name__ == "__main__":
     project_root = Path(__file__).resolve().parents[1]
     result = build_monthly_close(project_root)
     print(f"Skrev {result.workbook_path}")
-    print(f"Periode: {result.period}; {len(result.invoices)} fakturaer til kontroll")
+    current_count = int(result.invoices["er_aktuell"].fillna(False).sum())
+    print(f"Periode: {result.period}; {current_count} aktuelle fakturaer til kontroll")

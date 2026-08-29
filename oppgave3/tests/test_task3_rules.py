@@ -19,6 +19,10 @@ class Task3RulesTest(unittest.TestCase):
         self.assertEqual(rules.budget_version, "2026B")
         self.assertEqual(rules.cash.section, "712")
         self.assertEqual(set(rules.workflow_candidates.completed_actions), {"ATTEST", "BDMGOD"})
+        self.assertFalse(
+            rules.workflow_candidates.include_amounts_in_calculations,
+            "Ugodkjente workflowbeløp skal ikke påvirke regnskapstall",
+        )
 
     def test_overlapping_account_ranges_are_rejected(self) -> None:
         raw = json.loads(RULES_PATH.read_text(encoding="utf-8"))

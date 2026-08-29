@@ -38,11 +38,17 @@ nedlasting.
 
 ## Regler
 
-`config/task3_rules.json` inneholder rapportår, budsjettversjon, seksjoner,
-kontointervaller, finansieringsmapping, kontantregel og workflowhandlinger.
+`config/task3_rules.json` inneholder rapportår, budsjettversjon, seksjonene i
+Excel-malen, kontointervaller, finansieringsmapping, kontantregel og
+workflowhandlinger. Webrapporten viser alle reelle seksjoner som har hovedbok-
+eller budsjettdata i valgt periode. Dummyseksjon `999` vises ikke.
 `scripts/task3_rules.py` validerer konfigurasjonen. Statusen er
 `forelopig_ikke_faglig_godkjent`, så endringer krever dokumentert faglig
 beslutning og ny full test.
+
+Workflowposter eldre enn 31 dager holdes utenfor den aktuelle arbeidslisten,
+men beholdes som synlig kontrollgrunnlag. Workflowbeløp påvirker ikke
+regnskapstall eller avsetningstall før utvalgsregelen er faglig godkjent.
 
 ## Kjøring
 

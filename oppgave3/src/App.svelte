@@ -27,6 +27,8 @@
   let monthlySummary = [];
   let monthlyInvoices = [];
   let monthlyValidations = [];
+  let selectedYear = '2026';
+  let selectedMonth = '';
   let selectedPeriod = '';
   let workflowRows = null;
   let workflowEvents = null;
@@ -49,9 +51,13 @@
         readParquet(localFiles['monthly_close_invoices.parquet']),
         readParquet(localFiles['monthly_close_validation.parquet'])
       ]);
-      selectedPeriod = [...new Set(monthlySummary.map((row) => String(row.periode)))]
-        .sort()
-        .at(-1) ?? '';
+      const availablePeriods = [...new Set(monthlySummary.map((row) => String(row.periode)))].sort();
+      const availableYears = [...new Set(availablePeriods.map((period) => period.slice(0, 4)))].sort();
+      selectedYear = availableYears.includes('2026') ? '2026' : availableYears.at(-1) ?? '';
+      selectedMonth = availablePeriods
+        .filter((period) => period.startsWith(selectedYear))
+        .at(-1)
+        ?.slice(4) ?? '';
       dataFolderName = selection.folderName;
       dataReady = true;
     } catch (cause) {
@@ -84,13 +90,37 @@
     return workflowEvents;
   }
 
+  function chooseYear(year) {
+    selectedYear = year;
+    selectedMonth = monthlyPeriods
+      .filter((period) => period.startsWith(year))
+      .at(0)
+      ?.slice(4) ?? '';
+  }
+
+  const monthLabel = (month) => {
+    const label = new Intl.DateTimeFormat('nb-NO', { month: 'long' }).format(
+      new Date(2026, Number(month) - 1, 1)
+    );
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
   $: monthlyPeriods = [...new Set(monthlySummary.map((row) => String(row.periode)))]
     .sort((left, right) => right.localeCompare(left));
+  $: monthlyYears = [...new Set(monthlyPeriods.map((period) => period.slice(0, 4)))].sort(
+    (left, right) => right.localeCompare(left)
+  );
+  $: yearPeriods = monthlyPeriods.filter((period) => period.startsWith(selectedYear));
+  $: selectedPeriod = selectedYear && selectedMonth ? `${selectedYear}${selectedMonth}` : '';
+  $: if (yearPeriods.length && !yearPeriods.some((period) => period.slice(4) === selectedMonth)) {
+    selectedMonth = yearPeriods[0].slice(4);
+  }
   $: selectedMonthlySummary = monthlySummary.filter(
     (row) => String(row.periode) === selectedPeriod
   );
   $: latestMonthlyPeriod = monthlyPeriods[0] ?? '';
   $: selectedMonthlyInvoices = selectedPeriod === latestMonthlyPeriod ? monthlyInvoices : [];
+  $: currentMonthlyInvoices = selectedMonthlyInvoices.filter((row) => row.er_aktuell === true);
 </script>
 
 <svelte:head>
@@ -110,7 +140,7 @@
   </main>
 {:else}
 <div class="app-frame" data-folder={dataFolderName}>
-  <AppHeader {view} {metadata} candidateCount={selectedMonthlyInvoices.length} onNavigate={openView} />
+  <AppHeader {view} {metadata} candidateCount={currentMonthlyInvoices.length} onNavigate={openView} />
 
   <main id="main-content" tabindex="-1">
     {#if error}
@@ -123,16 +153,30 @@
       </section>
     {:else if view === 'close'}
       <section class="period-control" aria-label="Rapportperiode">
-        <label>
-          <span>Rapportperiode</span>
-          <select bind:value={selectedPeriod}>
-            {#each monthlyPeriods as period}
-              <option value={period}>{period.slice(0, 4)} · til og med månad {Number(period.slice(4))}</option>
+        <div class="year-control">
+          <span>År</span>
+          <div class="year-pills" role="group" aria-label="Velg rapportår">
+            {#each monthlyYears as year}
+              <button
+                type="button"
+                class:active={selectedYear === year}
+                aria-pressed={selectedYear === year}
+                on:click={() => chooseYear(year)}
+              >{year}</button>
+            {/each}
+          </div>
+        </div>
+        <label class="month-control">
+          <span>Måned</span>
+          <select bind:value={selectedMonth}>
+            {#each yearPeriods as period}
+              <option value={period.slice(4)}>{monthLabel(period.slice(4))}</option>
             {/each}
           </select>
         </label>
+        <p class="period-help">Viser månedstall og hittil i år til og med valgt måned.</p>
         {#if selectedPeriod !== latestMonthlyPeriod}
-          <p>Historiske tal er viste. Fakturakandidatar og Excel-utkast blir berre laga for nyaste periode.</p>
+          <p class="period-note">Historiske tall vises. Fakturakandidater og Excel-utkast lages bare for den nyeste perioden.</p>
         {/if}
       </section>
       <MonthlyCloseReport

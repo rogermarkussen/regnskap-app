@@ -28,6 +28,7 @@ class WorkflowCandidateRule:
     active_status: str
     completed_actions: tuple[str, ...]
     stale_after_days: int
+    include_amounts_in_calculations: bool
 
 
 @dataclass(frozen=True)
@@ -100,5 +101,8 @@ def load_task3_rules(path: Path | None = None) -> Task3Rules:
             active_status=str(workflow["active_status"]),
             completed_actions=actions,
             stale_after_days=int(workflow["stale_after_days"]),
+            include_amounts_in_calculations=bool(
+                workflow.get("include_amounts_in_calculations", False)
+            ),
         ),
     )

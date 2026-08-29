@@ -135,7 +135,8 @@ def main() -> None:
             f"""
             select count(*)
             from read_parquet('{MONTHLY_INVOICES_PATH.as_posix()}')
-            where maanedsavslutningsstatus <> 'Kandidat til kontroll'
+            where maanedsavslutningsstatus not in ('Aktuell kandidat', 'Historisk workflowpost')
+               or er_aktuell <> (alder_dager between 0 and {RULES.workflow_candidates.stale_after_days})
                or statusgrunnlag is null
                or bokforingskontroll <> 'Ikke bokført i mottatt hovedbokssnapshot'
                or konto is null
@@ -143,6 +144,16 @@ def main() -> None:
                or finansiering is null
             """
         ).fetchone()[0]
+        published_sections = {
+            str(row[0])
+            for row in conn.execute(
+                f"""
+                select distinct omfang_id
+                from read_parquet('{MONTHLY_SUMMARY_PATH.as_posix()}')
+                where omfang = 'Seksjon'
+                """
+            ).fetchall()
+        }
         monthly_validation_count = conn.execute(
             f"select count(*) from read_parquet('{MONTHLY_VALIDATION_PATH.as_posix()}')"
         ).fetchone()[0]
@@ -218,15 +229,21 @@ def main() -> None:
         )
     if SOURCES.cash_ledger and (min_period != "202401" or years != 3):
         raise SystemExit(
-            f"Fleirårsvisningen skal dekke 202401–{expected_period}, fikk {min_period}–{period}"
+            f"Flerårsvisningen skal dekke 202401–{expected_period}, fikk {min_period}–{period}"
         )
-    if sections != len(RULES.sections):
-        raise SystemExit(f"Forventet {len(RULES.sections)} seksjoner fra malen, fikk {sections}")
+    missing_template_sections = set(RULES.sections) - published_sections
+    if missing_template_sections:
+        raise SystemExit(
+            "Webrapporten mangler seksjoner fra Excel-malen: "
+            + ", ".join(sorted(missing_template_sections))
+        )
+    if "999" in published_sections:
+        raise SystemExit("Webrapporten skal ikke vise dummyseksjon 999")
     if nkom_financings == 0:
         raise SystemExit("Mangler Nkom-totaler per finansiering")
     if wrong_budget_version:
         raise SystemExit(
-            "Månedsavslutningen bruker feil budsjettversjon for eitt eller fleire år"
+            "Månedsavslutningen bruker feil budsjettversjon for ett eller flere år"
         )
     if monthly_invoice_errors:
         raise SystemExit(f"{monthly_invoice_errors} fakturarader bryter månedsavslutningsreglene")

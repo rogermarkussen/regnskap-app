@@ -30,6 +30,7 @@
   "workflow_candidates": {
     "active_status": "ACT",
     "completed_actions": ["ATTEST", "BDMGOD"],
-    "stale_after_days": 31
+    "stale_after_days": 31,
+    "include_amounts_in_calculations": false
   }
 }

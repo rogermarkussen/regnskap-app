@@ -35,8 +35,9 @@
   };
 
   const chooseFallback = async (event) => {
-    await useSelection(selectionFromInput(event.currentTarget.files));
-    event.currentTarget.value = '';
+    const input = event.currentTarget;
+    await useSelection(selectionFromInput(input.files));
+    input.value = '';
   };
 </script>
 

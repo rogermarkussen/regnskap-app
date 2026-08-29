@@ -108,7 +108,8 @@ har 496 hovedboksrader og to lønnsrader. Rapporten beregner:
 - ADK fra konto `6110–7834`;
 - driftskostnader som lønn pluss avskrivninger og ADK;
 - hovedbok og budsjett for aktuell måned, forrige måned og hittil i år;
-- seksjonsvisning for `711`, `712`, `721`, `731` og `741`;
+- seksjonsvisning for alle reelle seksjoner med hovedbok- eller budsjettdata;
+- egne Excel-faner for `711`, `712`, `721`, `731` og `741`, i tråd med mottatt mal;
 - total for hele Nkom per finansiering.
 
 Avvik beregnes som budsjett minus hovedbok, i samme retning som Excel-fasiten.
@@ -131,11 +132,12 @@ Workflowdimensjoner leses fra `logged_values`:
 - `B0` → prosjekt;
 - `R00` → finansiering.
 
-Bare fakturaer som ikke finnes som `ext_inv_ref` i mottatt hovedbok tas med.
-Siste dokumenterte handling `ATTEST` vises som «Til godkjenning», og `BDMGOD`
-vises foreløpig som «I etterkontroll». Dette er en teknisk tolkning som må
-godkjennes av workfloweier. Alle ti nåværende kandidater er eldre enn 31 dager
-og er derfor tydelig merket for kontroll.
+Fakturaer som ikke finnes som `ext_inv_ref` i mottatt hovedbok beholdes som
+kontrollgrunnlag. Bare poster med en registrert handling de siste 31 dagene
+vises i den aktuelle arbeidslisten. Eldre poster vises separat som historiske
+workflowposter fordi det ikke er dokumentert at `ACT`-rader ryddes bort når en
+flyt avsluttes. Ingen workflowbeløp påvirker regnskapstallene før regelen er
+faglig godkjent.
 
 ### Excel og bilag
 

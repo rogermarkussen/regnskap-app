@@ -28,6 +28,7 @@ LEDGER_PATH = CONTRACT.path("common.ledger")
 BUDGET_HEADER_PATH = CONTRACT.path("common.budget_header")
 BUDGET_VALUE_PATH = CONTRACT.path("common.budget_values")
 PUBLISHED_SUMMARY_PATH = CONTRACT.generated_dir("oppgave3") / "web" / "monthly_close_summary.parquet"
+PUBLISHED_INVOICES_PATH = CONTRACT.generated_dir("oppgave3") / "web" / "monthly_close_invoices.parquet"
 FASIT_PERIOD = "202603"
 TOLERANCE_NOK = 0.02
 
@@ -102,6 +103,7 @@ class Task3FasitTest(unittest.TestCase):
             BUDGET_HEADER_PATH,
             BUDGET_VALUE_PATH,
             PUBLISHED_SUMMARY_PATH,
+            PUBLISHED_INVOICES_PATH,
         ]
         missing = [str(path.relative_to(ROOT)) for path in required if not path.exists()]
         if missing:
@@ -118,6 +120,9 @@ class Task3FasitTest(unittest.TestCase):
             )
             cls.published = connection.execute(
                 f"select * from read_parquet('{PUBLISHED_SUMMARY_PATH.as_posix()}')"
+            ).df()
+            cls.invoices = connection.execute(
+                f"select * from read_parquet('{PUBLISHED_INVOICES_PATH.as_posix()}')"
             ).df()
         finally:
             connection.close()
@@ -319,6 +324,51 @@ class Task3FasitTest(unittest.TestCase):
                 TOLERANCE_NOK,
                 f"Publisert {measure} kan ikke reproduseres",
             )
+
+    def test_seksjonsrapporten_dekker_seksjoner_med_hovedbokstall(self) -> None:
+        period = str(self.published["periode"].max())
+        connection = duckdb.connect()
+        try:
+            expected = {
+                str(row[0])
+                for row in connection.execute(
+                    f"""
+                    select distinct trim(dim_1)
+                    from read_parquet('{LEDGER_PATH.as_posix()}')
+                    where trim(period) between ? and ?
+                      and try_cast(account as integer) between 5000 and 7834
+                      and regexp_matches(trim(dim_1), '^[0-9]{{3}}$')
+                      and trim(dim_1) <> '999'
+                    """,
+                    [f"{period[:4]}01", period],
+                ).fetchall()
+            }
+        finally:
+            connection.close()
+        published = set(
+            self.published.loc[
+                (self.published["periode"] == period)
+                & (self.published["omfang"] == "Seksjon"),
+                "omfang_id",
+            ].astype(str)
+        )
+        self.assertTrue(
+            expected <= published,
+            f"Rapporten mangler seksjoner med hovedbokstall: {sorted(expected - published)}",
+        )
+        self.assertNotIn("999", published, "Dummyseksjon 999 skal ikke vises")
+
+    def test_historiske_workflowposter_er_ute_av_arbeidslisten(self) -> None:
+        current = self.invoices[self.invoices["er_aktuell"] == True]  # noqa: E712
+        historical = self.invoices[self.invoices["er_aktuell"] != True]  # noqa: E712
+        self.assertTrue(
+            (current["alder_dager"] <= 31).all(),
+            "Arbeidslisten inneholder workflowposter eldre enn 31 dager",
+        )
+        self.assertTrue(
+            (historical["maanedsavslutningsstatus"] == "Historisk workflowpost").all(),
+            "Historiske poster mangler tydelig status",
+        )
 
     def test_publisert_avvik_er_budsjett_minus_hovedbok(self) -> None:
         for span in ("maaned", "forrige", "hittil"):
