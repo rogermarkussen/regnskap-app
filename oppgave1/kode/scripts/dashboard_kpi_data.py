@@ -67,13 +67,40 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _budget_amount_sql(
+    connection: duckdb.DuckDBPyConnection,
+    path: Path,
+    alias: str = "v",
+) -> str:
+    columns = {
+        row[0]
+        for row in connection.execute(
+            f"describe select * from read_parquet('{path.as_posix()}')"
+        ).fetchall()
+    }
+    candidates = [
+        f"try_cast({alias}.{name} as double)"
+        for name in ("amount", "amount1")
+        if name in columns
+    ]
+    if not candidates:
+        raise ValueError(f"{path.name} mangler både amount og amount1")
+    return candidates[0] if len(candidates) == 1 else f"coalesce({', '.join(candidates)})"
+
+
 def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
     """Beskriv nøyaktig hvilket lokalt datasett oppgave 1 er bygget fra."""
     sources = task1_sources()
     actual_path = sources.ledger
     budget_header_path = sources.budget_header
     budget_value_path = sources.budget_values
-    source_paths = (actual_path, budget_header_path, budget_value_path)
+    budget_versions_path = sources.budget_versions
+    source_paths = (
+        actual_path,
+        budget_header_path,
+        budget_value_path,
+        budget_versions_path,
+    )
 
     missing = [path.as_posix() for path in source_paths if not path.is_file()]
     if missing:
@@ -83,6 +110,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
 
     connection = duckdb.connect()
     try:
+        budget_amount = _budget_amount_sql(connection, budget_value_path)
         actual = connection.execute(
             f"""
             select
@@ -102,7 +130,9 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               min(trim(v.period)) as periode_fra,
               max(trim(v.period)) as periode_til,
               count(*) as antall_rader,
-              count(*) filter (where try_cast(v.amount as double) is null) as ugyldige_belop
+              count(*) filter (
+                where {budget_amount} is null
+              ) as ugyldige_belop
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
             where h.version = substr(trim(v.period), 1, 4) || 'B'
@@ -110,6 +140,13 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               and try_cast(substr(trim(v.period), 5, 2) as integer) between 1 and 12
             """
         ).fetchone()
+        budget_versions = connection.execute(
+            f"""
+            select string_agg(version || ' · ' || description, '; ' order by version)
+            from read_parquet('{budget_versions_path.as_posix()}')
+            where regexp_matches(version, '^20[0-9]{{2}}B$')
+            """
+        ).fetchone()[0]
     finally:
         connection.close()
 
@@ -137,7 +174,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
                 "hovedbok_siste_transaksjonsdato": actual[2],
                 "hovedbok_rader": actual[3],
                 "budsjett_kilde": f"{budget_header_path.name} + {budget_value_path.name}",
-                "budsjettversjon": "Opprinnelig budsjett per år",
+                "budsjettversjon": budget_versions or "Opprinnelig budsjett per år",
                 "budsjett_periode_fra": budget[0],
                 "budsjett_periode_til": budget[1],
                 "budsjett_rader": budget[2],
@@ -213,6 +250,7 @@ def _read_sources(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     connection = duckdb.connect()
     try:
+        budget_amount = _budget_amount_sql(connection, budget_value_path)
         actual = connection.execute(
             f"""
             select
@@ -243,7 +281,7 @@ def _read_sources(
               end as section_code,
               trim(cast(v.period as varchar)) as period,
               cast(h.version as varchar) as budget_version,
-              try_cast(v.amount as double) / 1000.0 as amount_tusen
+              {budget_amount} / 1000.0 as amount_tusen
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
             where h.version = substr(trim(cast(v.period as varchar)), 1, 4) || 'B'

@@ -17,6 +17,14 @@ og miljøvariabelen `REGNSKAP_DATA_ROOT`. Standard datarot er søskenmappen
 
 Les [`DATA.md`](DATA.md) før du oppdaterer data eller publiserer et bygg.
 
+Den komplette, lokale Parquet-mappa under `data/` kan testast slik:
+
+```bash
+npm run test:data-folder
+```
+
+Når kommandoen er ferdig, kan `data/` veljast direkte i alle tre appane.
+
 ## Kom i gang
 
 Krav: Node.js 22, Python/uv og DuckDB CLI.

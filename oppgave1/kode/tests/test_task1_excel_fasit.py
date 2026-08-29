@@ -149,8 +149,9 @@ class Task1ExcelFasitTest(unittest.TestCase):
         expected_ratio = float(self.fasit["C15"].value)
         self.assertAlmostEqual(calculated_ratio, expected_ratio, delta=1e-10)
 
-    def test_alle_63_kortlinjer_har_sporbart_regnestykke(self) -> None:
-        self.assertEqual(len(self.aggregate), 63)
+    def test_alle_kortlinjer_har_sporbart_regnestykke(self) -> None:
+        rows_per_period = self.aggregate.groupby("period_key").size()
+        self.assertTrue((rows_per_period == 9).all())
         self.assertEqual(
             set(self.calculated["kilde_hovedbok"]), {"agltransact.parquet"}
         )
@@ -161,7 +162,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
         for row in self.aggregate.itertuples():
             with self.subTest(period=row.period_key, metric=row.metric):
                 details = json.loads(row.grunnlag_json)
-                if not math.isnan(float(row.prosentverdi)):
+                if row.metric == "Lønnsandel av totale kostnader":
+                    if math.isnan(float(row.prosentverdi)):
+                        self.assertEqual(float(details[1]["value"]), 0.0)
+                        continue
                     self.assertEqual(len(details), 3)
                     self.assertAlmostEqual(
                         float(row.prosentverdi),
@@ -198,7 +202,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
     def test_godkjente_forretningsregler_er_versjonert(self) -> None:
         self.assertEqual(set(self.calculated["regelversjon"]), {BUSINESS_RULE_VERSION})
-        self.assertEqual(set(self.calculated["budsjettversjon"]), {"2026B"})
+        expected_versions = self.calculated["period_key"].str[:4] + "B"
+        self.assertTrue(
+            (self.calculated["budsjettversjon"] == expected_versions).all()
+        )
         self.assertEqual(_budget_financing("212"), "154345")
         self.assertEqual(_budget_financing("761"), "154322+045101")
         self.assertEqual(_budget_financing("711"), "154301")
@@ -367,7 +374,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
         aggregate = calculated_without_fasit[
             calculated_without_fasit["section_code"] == "all"
         ]
-        self.assertEqual(len(aggregate), 63)
+        rows_per_period = aggregate.groupby("period_key").size()
+        self.assertTrue((rows_per_period == 9).all())
         self.assertEqual(
             set(aggregate["finansiering"]),
             {"154301", "154345", "154322+045101"},
@@ -378,7 +386,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertIn("251", set(self.calculated["section_code"]))
         self.assertIn("__missing__", set(self.calculated["section_code"]))
         counts = self.calculated.groupby("section_code").size()
-        self.assertTrue((counts == 63).all())
+        self.assertTrue((counts == len(self.aggregate)).all())
 
         adk = self.calculated[
             (self.calculated["period_key"] == "202606")

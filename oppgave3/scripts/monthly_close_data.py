@@ -45,6 +45,27 @@ class MonthlyCloseResult:
     workbook_path: Path
 
 
+def _budget_amount_sql(
+    conn: duckdb.DuckDBPyConnection,
+    path: Path,
+    alias: str = "v",
+) -> str:
+    columns = {
+        row[0]
+        for row in conn.execute(
+            f"describe select * from read_parquet('{path.as_posix()}')"
+        ).fetchall()
+    }
+    candidates = [
+        f"try_cast({alias}.{name} as double)"
+        for name in ("amount", "amount1")
+        if name in columns
+    ]
+    if not candidates:
+        raise ValueError(f"{path.name} mangler både amount og amount1")
+    return candidates[0] if len(candidates) == 1 else f"coalesce({', '.join(candidates)})"
+
+
 def _category_case(alias: str) -> str:
     salary = RULES.account_categories["Lønnskostnader"]
     depreciation = RULES.account_categories["Avskrivninger"]
@@ -85,11 +106,11 @@ def _actual_financing(alias: str) -> str:
     """
 
 
-def _latest_period(conn: duckdb.DuckDBPyConnection, ledger_path: Path) -> str:
+def _available_periods(conn: duckdb.DuckDBPyConnection, ledger_path: Path) -> list[str]:
     salary = RULES.account_categories["Lønnskostnader"]
-    period = conn.execute(
+    rows = conn.execute(
         f"""
-        select max(periode)
+        select periode
         from (
           select
             trim(period) as periode,
@@ -98,16 +119,22 @@ def _latest_period(conn: duckdb.DuckDBPyConnection, ledger_path: Path) -> str:
               where try_cast(account as integer) between {salary.first} and {salary.last}
             ) as lonnsrader
           from read_parquet('{ledger_path.as_posix()}')
-          where regexp_matches(trim(period), '^{RULES.report_year}(0[1-9]|1[0-2])$')
+          where regexp_matches(trim(period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
           group by trim(period)
         )
         where lonnsrader > 0
           and siste_transaksjonsdato >= last_day(strptime(periode || '01', '%Y%m%d'))
+        order by periode
         """
-    ).fetchone()[0]
-    if not period:
-        raise ValueError(f"Fant ingen avsluttet {RULES.report_year}-periode i hovedboken")
-    return str(period)
+    ).fetchall()
+    periods = [str(row[0]) for row in rows]
+    if not periods:
+        raise ValueError("Fant ingen avsluttet periode i hovedboken")
+    return periods
+
+
+def _latest_period(conn: duckdb.DuckDBPyConnection, ledger_path: Path) -> str:
+    return _available_periods(conn, ledger_path)[-1]
 
 
 def _summary_frame(
@@ -116,9 +143,12 @@ def _summary_frame(
     budget_header_path: Path,
     budget_value_path: Path,
     period: str,
+    cash_ledger_path: Path | None = None,
 ) -> pd.DataFrame:
     previous_period = f"{int(period) - 1:06d}"
     year_start = f"{period[:4]}01"
+    budget_version = f"{period[:4]}B"
+    budget_amount = _budget_amount_sql(conn, budget_value_path)
     categories = pd.DataFrame(
         [
             {"kategori": "Lønnskostnader", "sortering": 1},
@@ -154,10 +184,10 @@ def _summary_frame(
           {_budget_financing_case('h')} as finansiering,
           {_category_case('h')} as kategori,
           trim(v.period) as period,
-          sum(try_cast(v.amount as double)) as amount_nok
+          sum({budget_amount}) as amount_nok
         from read_parquet('{budget_header_path.as_posix()}') h
         join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-        where h.version = '{RULES.budget_version}'
+        where h.version = '{budget_version}'
           and trim(v.period) between ? and ?
         group by h.dim_1, finansiering, kategori, v.period
         having kategori is not null
@@ -259,21 +289,24 @@ def _summary_frame(
         )
     result["periode"] = period
     result["forrige_periode"] = previous_period
-    result["budsjettversjon"] = RULES.budget_version
+    result["budsjettversjon"] = budget_version
     result["kildestatus"] = "Beregnet"
 
+    cash_source = cash_ledger_path or ledger_path
+    cash_period_field = "pay_period" if cash_ledger_path else "period"
+    cash_amount_field = "cash_amount" if cash_ledger_path else "amount"
     cash_712 = conn.execute(
         f"""
         select
           {_actual_financing('a')} as finansiering,
-          coalesce(sum(try_cast(amount as double)) filter (where trim(period) = ?), 0) as maaned,
-          coalesce(sum(try_cast(amount as double)) filter (where trim(period) = ?), 0) as forrige,
-          coalesce(sum(try_cast(amount as double)), 0) as hittil
-        from read_parquet('{ledger_path.as_posix()}') a
+          coalesce(sum(try_cast({cash_amount_field} as double)) filter (where trim({cash_period_field}) = ?), 0) as maaned,
+          coalesce(sum(try_cast({cash_amount_field} as double)) filter (where trim({cash_period_field}) = ?), 0) as forrige,
+          coalesce(sum(try_cast({cash_amount_field} as double)), 0) as hittil
+        from read_parquet('{cash_source.as_posix()}') a
         where trim(dim_1) = '{RULES.cash.section}'
           and trim(account) = '{RULES.cash.account}'
           and trim(dim_4) = '{RULES.cash.financing}'
-          and trim(period) between ? and ?
+          and trim({cash_period_field}) between ? and ?
         group by finansiering
         """,
         [period, previous_period, year_start, period],
@@ -304,8 +337,11 @@ def _summary_frame(
                         "avvik_hittil_nok": RULES.cash.budget_nok - ytd_value,
                         "periode": period,
                         "forrige_periode": previous_period,
-                        "budsjettversjon": RULES.budget_version,
-                        "kildestatus": f"Foreløpig kontantgrunnlag: hovedbok konto {RULES.cash.account}",
+                        "budsjettversjon": budget_version,
+                        "kildestatus": (
+                            f"Kontantgrunnlag: {cash_source.name}.{cash_amount_field}, "
+                            f"periodisert med {cash_period_field}"
+                        ),
                     }
                 )
     if cash_rows:
@@ -330,7 +366,7 @@ def _summary_frame(
                     "sortering": sorting,
                     "periode": period,
                     "forrige_periode": previous_period,
-                    "budsjettversjon": RULES.budget_version,
+                    "budsjettversjon": budget_version,
                     "kildestatus": "Kontantkilde per seksjon mangler",
                 }
             )
@@ -728,24 +764,27 @@ def _add_cash_712_detail_sheet(wb, root: Path, period: str) -> None:
     sheet_name = f"{RULES.cash.section} kontantdetaljer"
     if sheet_name in wb.sheetnames:
         del wb[sheet_name]
-    ledger_path = task3_sources().ledger
+    sources = task3_sources()
+    ledger_path = sources.cash_ledger or sources.ledger
+    period_field = "pay_period" if sources.cash_ledger else "period"
+    amount_field = "cash_amount" if sources.cash_ledger else "amount"
     conn = duckdb.connect()
     try:
         rows = conn.execute(
             f"""
             select
-              trim(period) as periode,
+              trim({period_field}) as periode,
               trim(account) as konto,
               trim(dim_1) as seksjon,
               trim(dim_2) as prosjekt,
               trim(dim_4) as finansiering,
               description as beskrivelse,
-              try_cast(amount as double) as belop_nok
+              try_cast({amount_field} as double) as belop_nok
             from read_parquet('{ledger_path.as_posix()}')
             where trim(dim_1) = '{RULES.cash.section}'
               and trim(account) = '{RULES.cash.account}'
               and trim(dim_4) = '{RULES.cash.financing}'
-              and trim(period) between ? and ?
+              and trim({period_field}) between ? and ?
             order by periode, prosjekt, belop_nok desc
             """,
             [f"{period[:4]}01", period],
@@ -1032,15 +1071,26 @@ def build_monthly_close(root: Path) -> MonthlyCloseResult:
 
     conn = duckdb.connect()
     try:
-        period = _latest_period(conn, ledger_path)
-        summary = _summary_frame(
-            conn, ledger_path, budget_header_path, budget_value_path, period
-        )
+        periods = _available_periods(conn, ledger_path)
+        period = periods[-1]
+        summaries = [
+            _summary_frame(
+                conn,
+                ledger_path,
+                budget_header_path,
+                budget_value_path,
+                candidate,
+                sources.cash_ledger,
+            )
+            for candidate in periods
+        ]
+        summary = pd.concat(summaries, ignore_index=True)
+        latest_summary = summary[summary["periode"] == period].copy()
         invoices, snapshot = _invoice_frame(conn, workflow_path, ledger_path)
     finally:
         conn.close()
 
-    workbook_path = _fill_workbook(root, summary, invoices, period, snapshot)
+    workbook_path = _fill_workbook(root, latest_summary, invoices, period, snapshot)
     missing_dimensions = int(
         invoices[["konto", "seksjon", "finansiering"]].isna().any(axis=1).sum()
     )
@@ -1051,11 +1101,11 @@ def build_monthly_close(root: Path) -> MonthlyCloseResult:
         [
             {"kontroll": "Aktuell periode", "status": "ok", "antall": 1, "detalj": f"Siste hovedboksperiode er {period}."},
             {"kontroll": "Seksjoner i mal", "status": "ok", "antall": len(SECTIONS), "detalj": f"Malen dekker {', '.join(SECTIONS)}."},
-            {"kontroll": "Budsjettversjon", "status": "ok", "antall": 1, "detalj": f"Budsjett {RULES.budget_version} er brukt."},
+            {"kontroll": "Budsjettversjon", "status": "ok", "antall": len({str(value) for value in summary['budsjettversjon']}), "detalj": f"Opprinnelig budsjett per rapportår er brukt ({summary['budsjettversjon'].min()}–{summary['budsjettversjon'].max()})."},
             {"kontroll": "Kandidater til fakturakontroll", "status": "warning" if len(invoices) else "ok", "antall": len(invoices), "detalj": f"Ikke bokført i snapshot, har {RULES.workflow_candidates.active_status}-oppgave og siste fullførte handling {actions_text}. Endelig fakturastatus må godkjennes."},
             {"kontroll": "Manglende fakturadimensjoner", "status": "warning" if missing_dimensions else "ok", "antall": missing_dimensions, "detalj": "Konto, seksjon og finansiering leses fra workflow-loggen."},
             {"kontroll": "Gamle workflowposter", "status": "warning" if stale_invoices else "ok", "antall": stale_invoices, "detalj": f"Poster eldre enn {stale_days} dager må bekreftes mot fakturasystemet."},
-            {"kontroll": f"Kontantgrunnlag seksjon {RULES.cash.section}", "status": "warning", "antall": len(summary[(summary["omfang"] == "Seksjon") & (summary["omfang_id"] == RULES.cash.section)]), "detalj": f"Konto {RULES.cash.account} / finansiering {RULES.cash.financing} er brukt foreløpig og må bekreftes som riktig kontantgrunnlag."},
+            {"kontroll": f"Kontantgrunnlag seksjon {RULES.cash.section}", "status": "ok" if sources.cash_ledger else "warning", "antall": len(latest_summary[(latest_summary["omfang"] == "Seksjon") & (latest_summary["omfang_id"] == RULES.cash.section)]), "detalj": f"Konto {RULES.cash.account} / finansiering {RULES.cash.financing} er periodisert med pay_period i acatrans." if sources.cash_ledger else f"Konto {RULES.cash.account} / finansiering {RULES.cash.financing} er brukt foreløpig og må bekreftes som riktig kontantgrunnlag."},
             {"kontroll": "Bilagsautomatisering", "status": "warning", "antall": len(invoices), "detalj": "Kun kontrollutkast genereres. Ingen import- eller bokføringsfil godkjennes automatisk."},
         ]
     )

@@ -23,25 +23,10 @@
     { value: '154322+045101', label: '154322 + 045101' },
     { value: 'alle', label: 'Alle finansieringer' }
   ];
-  const periodOptions = [
-    { value: 'latest', label: 'Nyeste komplette måned' },
-    { value: 'p1_3', label: 'Jan–mar' },
-    { value: 'p1_4', label: 'Jan–apr' },
-    { value: 'p1_6', label: 'Jan–jun' }
-  ];
-  const monthOptions = [
-    { period: 202601, shortLabel: 'Jan', exportLabel: 'Januar' },
-    { period: 202602, shortLabel: 'Feb', exportLabel: 'Februar' },
-    { period: 202603, shortLabel: 'Mar', exportLabel: 'Mars' },
-    { period: 202604, shortLabel: 'Apr', exportLabel: 'April' },
-    { period: 202605, shortLabel: 'Mai', exportLabel: 'Mai' },
-    { period: 202606, shortLabel: 'Jun', exportLabel: 'Juni' },
-    { period: 202607, shortLabel: 'Jul', exportLabel: 'Juli' },
-    { period: 202608, shortLabel: 'Aug', exportLabel: 'August' },
-    { period: 202609, shortLabel: 'Sep', exportLabel: 'September' },
-    { period: 202610, shortLabel: 'Okt', exportLabel: 'Oktober' },
-    { period: 202611, shortLabel: 'Nov', exportLabel: 'November' },
-    { period: 202612, shortLabel: 'Des', exportLabel: 'Desember' }
+  const monthNames = [
+    ['Jan', 'Januar'], ['Feb', 'Februar'], ['Mar', 'Mars'], ['Apr', 'April'],
+    ['Mai', 'Mai'], ['Jun', 'Juni'], ['Jul', 'Juli'], ['Aug', 'August'],
+    ['Sep', 'September'], ['Okt', 'Oktober'], ['Nov', 'November'], ['Des', 'Desember']
   ];
 
   let loading = false;
@@ -51,6 +36,7 @@
   let rows = [];
   let sections = [];
   let budgetVersion = '2026B';
+  let selectedYear = 2026;
   let financing = '154301';
   let reportPeriod = 'latest';
   let sectionCode = 'all';
@@ -138,9 +124,9 @@
       const maanedRows = exportRows.map((row) => ({
         ...rowIdentity(row),
         ...Object.fromEntries(
-          monthOptions.map(({ period, exportLabel }) => [
+          monthOptions.map(({ month, exportLabel }) => [
             exportLabel,
-            row[`budsjett_${period}_tusen`]
+            row[`budsjett_${String(month).padStart(2, '0')}_tusen`]
           ])
         ),
         'Totalt alle måneder': row.aarets_budsjett_tusen
@@ -187,11 +173,29 @@
       if (!['section_code', 'finansiering', 'rapportperiode', 'row_type'].every((name) => columns.has(name))) {
         throw new Error('Datakilden har et ukjent format');
       }
-      rows = loadedRows.map((row) => ({
-        ...row,
-        excel_row: Number(row.excel_row),
-        section_sort: Number(row.section_sort)
-      }));
+      const modernRows = loadedRows.some((row) => Number.isFinite(Number(row.report_year)))
+        ? loadedRows
+        : loadedRows.filter((row) => row.rapportperiode !== 'latest');
+      rows = modernRows.map((row) => {
+        const legacyPeriod = { p1_3: 202603, p1_4: 202604, p1_6: 202606 }[row.rapportperiode];
+        const periodTo = Number(row.period_to ?? legacyPeriod);
+        const reportYear = Number(row.report_year ?? Math.trunc(periodTo / 100));
+        return {
+          ...row,
+          ...Object.fromEntries(monthNames.map((_, index) => {
+            const month = String(index + 1).padStart(2, '0');
+            return [
+              `budsjett_${month}_tusen`,
+              row[`budsjett_${reportYear}${month}_tusen`] ?? row[`budsjett_${month}_tusen`]
+            ];
+          })),
+          report_year: reportYear,
+          period_to: periodTo,
+          rapportperiode: String(periodTo),
+          excel_row: Number(row.excel_row),
+          section_sort: Number(row.section_sort)
+        };
+      });
       budgetVersion = String(rows[0]?.budsjettversjon ?? budgetVersion);
       dataFolderName = selection.folderName;
       dataReady = true;
@@ -204,9 +208,14 @@
         }])
       ).values()].sort((left, right) => Number(left.sort) - Number(right.sort));
 
+      const dataYears = rows.map((row) => Number(row.report_year)).filter(Number.isFinite);
+      if (dataYears.length) selectedYear = Math.max(...dataYears);
+
       const params = new URLSearchParams(window.location.search);
       financing = validParam(params.get('finansiering'), reportOptions, financing);
-      reportPeriod = validParam(params.get('periode'), periodOptions, reportPeriod);
+      const yearParam = Number(params.get('aar'));
+      if ([...new Set(dataYears)].includes(yearParam)) selectedYear = yearParam;
+      reportPeriod = params.get('periode') ?? reportPeriod;
       sectionCode = validParam(params.get('seksjon'), sections, sectionCode);
     } catch (error) {
       loadError = error instanceof Error ? error.message : 'Rapportdata kunne ikke lastes';
@@ -217,7 +226,29 @@
     }
   };
 
-  $: hierarchicalRows = selectReportRows(rows, { financing, reportPeriod, sectionCode });
+  $: availableYears = [...new Set(rows.map((row) => Number(row.report_year)).filter(Number.isFinite))]
+    .sort((left, right) => right - left);
+  $: availablePeriods = [...new Set(rows
+    .filter((row) => Number(row.report_year) === selectedYear)
+    .map((row) => String(row.rapportperiode)))]
+    .sort();
+  $: effectivePeriod = reportPeriod === 'latest' || !availablePeriods.includes(reportPeriod)
+    ? availablePeriods.at(-1)
+    : reportPeriod;
+  $: periodOptions = availablePeriods.map((period) => ({
+    value: period,
+    label: `Januar–${monthNames[Number(period.slice(4)) - 1]?.[1].toLocaleLowerCase('nb-NO')} ${period.slice(0, 4)}`
+  })).reverse();
+  $: monthOptions = monthNames.map(([shortLabel, exportLabel], index) => ({
+    month: index + 1,
+    shortLabel,
+    exportLabel
+  }));
+  $: hierarchicalRows = selectReportRows(rows, {
+    financing,
+    reportPeriod: effectivePeriod,
+    sectionCode
+  });
   $: ({ grandTotal: total, summaryRows, mainGroups, groupKeys } = reportTotals(hierarchicalRows));
   $: filteredRows = filterReportRows(hierarchicalRows, {
     mainGroup,
@@ -235,7 +266,8 @@
   $: if (dataReady && !loading && !loadError && typeof window !== 'undefined') {
     const params = new URLSearchParams();
     if (financing !== '154301') params.set('finansiering', financing);
-    if (reportPeriod !== 'latest') params.set('periode', reportPeriod);
+    if (selectedYear !== availableYears[0]) params.set('aar', String(selectedYear));
+    if (reportPeriod !== 'latest') params.set('periode', effectivePeriod);
     if (sectionCode !== 'all') params.set('seksjon', sectionCode);
     const query = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
@@ -274,8 +306,7 @@
       </div>
       <div class="period-stamp" aria-label={`Rapportperiode ${periodText}`}>
         <span>Periode</span>
-        <strong>{periodText.slice(0, 5)}</strong>
-        <small>{periodText.slice(-4)}</small>
+        <strong>{periodText}</strong>
       </div>
     </header>
 
@@ -294,18 +325,20 @@
       </label>
       <div class="scope-period">
         <span>Rapportperiode</span>
-        <div class="period-switch">
-          {#each periodOptions as option}
-            <button
-              type="button"
-              class:active={reportPeriod === option.value}
-              aria-pressed={reportPeriod === option.value}
-              on:click={() => {
-                reportPeriod = option.value;
-                resetDrilldown();
-              }}>{option.label}</button
-            >
-          {/each}
+        <div class="period-switch period-selects">
+          <label>
+            <span>År</span>
+            <select bind:value={selectedYear} on:change={() => { reportPeriod = 'latest'; resetDrilldown(); }}>
+              {#each availableYears as year}<option value={year}>{year}</option>{/each}
+            </select>
+          </label>
+          <label>
+            <span>Til og med</span>
+            <select bind:value={reportPeriod} on:change={resetDrilldown}>
+              <option value="latest">Nyaste tilgjengelege månad</option>
+              {#each periodOptions as option}<option value={option.value}>{option.label}</option>{/each}
+            </select>
+          </label>
         </div>
       </div>
     </section>

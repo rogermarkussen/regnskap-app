@@ -18,6 +18,7 @@ def workflow_invoice_frames(
     sources = task3_sources()
     workflow_path = sources.workflow
     ledger_path = sources.ledger
+    extra_validations: list[dict[str, object]] = []
     if not workflow_path.exists():
         raise FileNotFoundError(f"Mangler workflowdata: {workflow_path}")
     if not ledger_path.exists():
@@ -259,6 +260,132 @@ def workflow_invoice_frames(
               ) as seneste_hovedboksperiode
             """
         ).fetchone()
+
+        if sources.invoice_queue_history:
+            queue = conn.execute(
+                f"""
+                select
+                  trim(ext_inv_ref) as fakturanr,
+                  min(try_cast(received as timestamptz)) as mottatt_tid,
+                  arg_max(status, try_cast(received as timestamptz)) as fakturako_status,
+                  string_agg(distinct trim(voucher_no), ', ' order by trim(voucher_no)) as fakturako_bilagsnr,
+                  count(distinct trim(voucher_no)) as fakturako_bilag_antall,
+                  count(*) as fakturako_rader
+                from read_parquet('{sources.invoice_queue_history.as_posix()}')
+                where trim(coalesce(ext_inv_ref, '')) <> ''
+                group by 1
+                """
+            ).df()
+            invoices = invoices.merge(queue, on="fakturanr", how="left")
+            queue_matches = int(invoices["fakturako_rader"].notna().sum())
+            extra_validations.append(
+                {
+                    "kontroll": "Kobling til fakturakø",
+                    "status": "ok" if queue_matches else "warning",
+                    "antall": queue_matches,
+                    "detalj": (
+                        f"{queue_matches} av {len(invoices)} workflowfakturaer er funnet i "
+                        "a47en53invoicequeuehistr."
+                    ),
+                }
+            )
+
+        if sources.ledger_map:
+            mapped = conn.execute(
+                f"""
+                with workflow_oids as (
+                  select distinct
+                    trim(col2_value) as fakturanr,
+                    lower(trim(oid)) as oid
+                  from read_parquet('{workflow_path.as_posix()}')
+                  where col2_descr = 'Fakturanr'
+                    and trim(coalesce(col2_value, '')) <> ''
+                ), mapped_vouchers as (
+                  select
+                    workflow_oids.fakturanr,
+                    trim(m.voucher_no) as mapped_bilagsnr
+                  from workflow_oids
+                  join read_parquet('{sources.ledger_map.as_posix()}') m
+                    on workflow_oids.oid = lower(trim(m.oid))
+                ), ledger_vouchers as (
+                  select distinct trim(voucher_no) as mapped_bilagsnr
+                  from read_parquet('{ledger_path.as_posix()}')
+                )
+                select
+                  mapped_vouchers.fakturanr,
+                  string_agg(
+                    distinct mapped_vouchers.mapped_bilagsnr,
+                    ', ' order by mapped_vouchers.mapped_bilagsnr
+                  ) as mapped_bilagsnr,
+                  count(distinct mapped_vouchers.mapped_bilagsnr) as mapped_bilag_antall,
+                  count(distinct ledger_vouchers.mapped_bilagsnr) as mapped_regnskapsbilag
+                from mapped_vouchers
+                left join ledger_vouchers using (mapped_bilagsnr)
+                group by mapped_vouchers.fakturanr
+                """
+            ).df()
+            invoices = invoices.merge(mapped, on="fakturanr", how="left")
+            event_map = conn.execute(
+                f"""
+                select
+                  lower(trim(oid)) as oid_lower,
+                  string_agg(distinct trim(voucher_no), ', ' order by trim(voucher_no)) as mapped_bilagsnr
+                from read_parquet('{sources.ledger_map.as_posix()}')
+                group by 1
+                """
+            ).df()
+            events["oid_lower"] = events["oid"].astype(str).str.strip().str.lower()
+            events = events.merge(event_map, on="oid_lower", how="left").drop(columns="oid_lower")
+            mapped_flows = int(invoices["mapped_bilag_antall"].fillna(0).gt(0).sum())
+            recovered = (
+                invoices["regnskapsrader"].isna()
+                & invoices["mapped_regnskapsbilag"].fillna(0).gt(0)
+            )
+            invoices.loc[recovered, "koblingskvalitet"] = "Sikker"
+            invoices.loc[recovered, "koblingsaarsak"] = (
+                "Workflow-oid er koblet til hovedboksbilag gjennom agltransactmap"
+            )
+            extra_validations.append(
+                {
+                    "kontroll": "Workflow-oid mot bilagskart",
+                    "status": "ok" if mapped_flows else "warning",
+                    "antall": mapped_flows,
+                    "detalj": (
+                        f"{mapped_flows} workflowfakturaer har bilagskobling gjennom "
+                        f"agltransactmap; {int(recovered.sum())} ble gjenfunnet i hovedboken."
+                    ),
+                }
+            )
+
+        if sources.receivables:
+            receivables = conn.execute(
+                f"""
+                select
+                  trim(ext_inv_ref) as fakturanr,
+                  count(*) as reskontro_rader,
+                  count(*) filter (
+                    where lower(trim(coalesce(is_open_post, ''))) in ('1', 'true', 't', 'y')
+                  ) as opne_reskontropostar,
+                  max(try_cast(due_date as date)) as siste_forfallsdato,
+                  max(trim(apar_name)) as reskontro_leverandor
+                from read_parquet('{sources.receivables.as_posix()}')
+                where trim(coalesce(ext_inv_ref, '')) <> ''
+                group by 1
+                """
+            ).df()
+            invoices = invoices.merge(receivables, on="fakturanr", how="left")
+            receivable_matches = int(invoices["reskontro_rader"].notna().sum())
+            extra_validations.append(
+                {
+                    "kontroll": "Kobling til reskontro",
+                    "status": "ok",
+                    "antall": receivable_matches,
+                    "detalj": (
+                        f"{receivable_matches} workflowfakturaer finnes i det mottatte "
+                        "acrtrans-snapshotet."
+                    ),
+                }
+            )
     finally:
         conn.close()
 
@@ -277,6 +404,13 @@ def workflow_invoice_frames(
                 ).isoformat(),
                 "seneste_bilagsdato": source_coverage[1],
                 "seneste_hovedboksperiode": source_coverage[2],
+                "fakturako_kilde": (
+                    "manifest:task3.invoice_queue_history"
+                    if sources.invoice_queue_history
+                    else None
+                ),
+                "bilagskart_kilde": "manifest:common.ledger_map" if sources.ledger_map else None,
+                "reskontro_kilde": "manifest:common.receivables" if sources.receivables else None,
             }
         ]
     )
@@ -351,4 +485,8 @@ def workflow_invoice_frames(
             ),
         ]
     )
+    if extra_validations:
+        validations = pd.concat(
+            [validations, pd.DataFrame(extra_validations)], ignore_index=True
+        )
     return invoices, events, validations, metadata

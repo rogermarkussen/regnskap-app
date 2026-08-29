@@ -17,6 +17,7 @@ class Task1Sources:
     ledger: Path
     budget_header: Path
     budget_values: Path
+    budget_versions: Path
     dimension_values: Path
     generated_dir: Path
 
@@ -27,6 +28,7 @@ def task1_sources() -> Task1Sources:
         ledger=contract.path("common.ledger"),
         budget_header=contract.path("common.budget_header"),
         budget_values=contract.path("common.budget_values"),
+        budget_versions=contract.path("task1.budget_versions"),
         dimension_values=contract.path("task1.dimension_values"),
         generated_dir=contract.generated_dir("oppgave1"),
     )

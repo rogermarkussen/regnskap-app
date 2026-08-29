@@ -27,6 +27,7 @@
   let monthlySummary = [];
   let monthlyInvoices = [];
   let monthlyValidations = [];
+  let selectedPeriod = '';
   let workflowRows = null;
   let workflowEvents = null;
   let localFiles = null;
@@ -48,6 +49,9 @@
         readParquet(localFiles['monthly_close_invoices.parquet']),
         readParquet(localFiles['monthly_close_validation.parquet'])
       ]);
+      selectedPeriod = [...new Set(monthlySummary.map((row) => String(row.periode)))]
+        .sort()
+        .at(-1) ?? '';
       dataFolderName = selection.folderName;
       dataReady = true;
     } catch (cause) {
@@ -79,6 +83,14 @@
     }
     return workflowEvents;
   }
+
+  $: monthlyPeriods = [...new Set(monthlySummary.map((row) => String(row.periode)))]
+    .sort((left, right) => right.localeCompare(left));
+  $: selectedMonthlySummary = monthlySummary.filter(
+    (row) => String(row.periode) === selectedPeriod
+  );
+  $: latestMonthlyPeriod = monthlyPeriods[0] ?? '';
+  $: selectedMonthlyInvoices = selectedPeriod === latestMonthlyPeriod ? monthlyInvoices : [];
 </script>
 
 <svelte:head>
@@ -98,7 +110,7 @@
   </main>
 {:else}
 <div class="app-frame" data-folder={dataFolderName}>
-  <AppHeader {view} {metadata} candidateCount={monthlyInvoices.length} onNavigate={openView} />
+  <AppHeader {view} {metadata} candidateCount={selectedMonthlyInvoices.length} onNavigate={openView} />
 
   <main id="main-content" tabindex="-1">
     {#if error}
@@ -110,10 +122,23 @@
         </div>
       </section>
     {:else if view === 'close'}
+      <section class="period-control" aria-label="Rapportperiode">
+        <label>
+          <span>Rapportperiode</span>
+          <select bind:value={selectedPeriod}>
+            {#each monthlyPeriods as period}
+              <option value={period}>{period.slice(0, 4)} · til og med månad {Number(period.slice(4))}</option>
+            {/each}
+          </select>
+        </label>
+        {#if selectedPeriod !== latestMonthlyPeriod}
+          <p>Historiske tal er viste. Fakturakandidatar og Excel-utkast blir berre laga for nyaste periode.</p>
+        {/if}
+      </section>
       <MonthlyCloseReport
-        summary={monthlySummary}
-        invoices={monthlyInvoices}
-        validations={monthlyValidations}
+        summary={selectedMonthlySummary}
+        invoices={selectedMonthlyInvoices}
+        validations={selectedPeriod === latestMonthlyPeriod ? monthlyValidations : []}
         showDownload={!isPublicBuild}
       />
     {:else if workflowLoading}

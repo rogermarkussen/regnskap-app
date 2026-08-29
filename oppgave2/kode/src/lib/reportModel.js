@@ -49,9 +49,29 @@ export const filterReportRows = (
   });
 };
 
-export const reportTotals = (rows) => ({
-  grandTotal: rows.find((row) => row.radtekst === 'Driftskostnader') ?? {},
-  summaryRows: rows.filter((row) => row.row_type === 'total'),
-  mainGroups: [...new Set(rows.map((row) => row.hovedgruppe).filter(Boolean))],
-  groupKeys: rows.filter((row) => row.row_type === 'group').map((row) => row.group_key)
-});
+export const reportTotals = (rows) => {
+  const accountRows = rows.filter((row) => row.row_type === 'account');
+  const sum = (column) => {
+    const values = accountRows
+      .map((row) => row[column])
+      .filter((value) => value !== null && value !== undefined)
+      .map(Number)
+      .filter(Number.isFinite);
+    return values.length ? values.reduce((total, value) => total + value, 0) : null;
+  };
+  const calculated = {
+    hovedbok_tusen: sum('hovedbok_tusen'),
+    virksomhet_budsjett_tusen: sum('virksomhet_budsjett_tusen'),
+    avvik_tusen: sum('avvik_tusen'),
+    aarets_budsjett_tusen: sum('aarets_budsjett_tusen')
+  };
+  calculated.forbruk_av_aarets_budsjett = calculated.aarets_budsjett_tusen
+    ? calculated.hovedbok_tusen / calculated.aarets_budsjett_tusen
+    : null;
+  return {
+    grandTotal: rows.find((row) => row.radtekst === 'Driftskostnader') ?? calculated,
+    summaryRows: rows.filter((row) => row.row_type === 'total'),
+    mainGroups: [...new Set(rows.map((row) => row.hovedgruppe).filter(Boolean))],
+    groupKeys: rows.filter((row) => row.row_type === 'group').map((row) => row.group_key)
+  };
+};

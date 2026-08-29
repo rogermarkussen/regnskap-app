@@ -45,11 +45,35 @@ class DataContract:
         self.data_root = (
             configured_root or self.manifest_path.parent.parent / "Regnskap-data"
         ).resolve()
-        self.snapshot_id = snapshot_id
+        test_env_name = manifest.get("test_data_root_env", "REGNSKAP_TEST_DATA_ROOT")
+        configured_test_root = os.environ.get(test_env_name)
+        self.test_data_root = (
+            Path(configured_test_root).expanduser().resolve()
+            if configured_test_root
+            else None
+        )
+        self.snapshot_id = (
+            str(manifest.get("test_snapshot_id") or snapshot_id)
+            if self.test_data_root
+            else snapshot_id
+        )
         datasets = manifest.get("datasets")
         if not isinstance(datasets, dict) or not datasets:
             raise DataContractError("Datamanifestet må inneholde minst ett datasett")
-        self._datasets = datasets
+        self._datasets = dict(datasets)
+        self._dataset_roots = {
+            dataset_id: self.data_root for dataset_id in self._datasets
+        }
+        if self.test_data_root:
+            test_datasets = manifest.get("test_datasets")
+            if not isinstance(test_datasets, dict) or not test_datasets:
+                raise DataContractError(
+                    f"{test_env_name} er satt, men manifestet mangler test_datasets"
+                )
+            self._datasets.update(test_datasets)
+            self._dataset_roots.update(
+                {dataset_id: self.test_data_root for dataset_id in test_datasets}
+            )
 
     def dataset(self, dataset_id: str, *, verify_hash: bool = False) -> Dataset:
         raw = self._datasets.get(dataset_id)
@@ -58,8 +82,9 @@ class DataContract:
         relative = Path(str(raw.get("path", "")))
         if relative.is_absolute() or ".." in relative.parts:
             raise DataContractError(f"Ugyldig relativ datasti for {dataset_id}: {relative}")
-        path = (self.data_root / relative).resolve()
-        if not path.is_relative_to(self.data_root):
+        dataset_root = self._dataset_roots[dataset_id]
+        path = (dataset_root / relative).resolve()
+        if not path.is_relative_to(dataset_root):
             raise DataContractError(f"Datast stikker utenfor dataroten: {dataset_id}")
         if not path.is_file():
             raise DataContractError(f"Mangler datasett {dataset_id}: {path}")
@@ -97,7 +122,8 @@ class DataContract:
     def generated_dir(self, task_name: str) -> Path:
         if not task_name or any(part in task_name for part in ("/", "\\", "..")):
             raise DataContractError(f"Ugyldig oppgavenavn: {task_name}")
-        return self.data_root / "generated" / self.snapshot_id / task_name
+        output_root = self.test_data_root or self.data_root
+        return output_root / "generated" / self.snapshot_id / task_name
 
 
 def load_data_contract(repo_root: Path | None = None) -> DataContract:

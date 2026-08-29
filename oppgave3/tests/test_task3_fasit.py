@@ -271,7 +271,7 @@ class Task3FasitTest(unittest.TestCase):
         )
 
     def test_publiserte_tall_er_reproduserbare(self) -> None:
-        period = str(self.published["periode"].iloc[0])
+        period = str(self.published["periode"].max())
         connection = duckdb.connect()
         try:
             recalculated = _summary_frame(
@@ -293,7 +293,12 @@ class Task3FasitTest(unittest.TestCase):
             "budsjett_hittil_nok",
             "avvik_hittil_nok",
         ]
-        comparison = self.published[keys + measures].merge(
+        published = self.published[
+            (self.published["periode"] == period)
+            & (self.published["kildestatus"] == "Beregnet")
+        ]
+        recalculated = recalculated[recalculated["kildestatus"] == "Beregnet"]
+        comparison = published[keys + measures].merge(
             recalculated[keys + measures],
             on=keys,
             how="outer",
@@ -333,7 +338,7 @@ class Task3FasitTest(unittest.TestCase):
 
     def test_publiserte_driftskostnader_inkluderer_avskrivninger(self) -> None:
         ordinary = self.published[self.published["kildestatus"] == "Beregnet"]
-        keys = ["omfang", "omfang_id", "finansiering"]
+        keys = ["periode", "omfang", "omfang_id", "finansiering"]
         measures = [
             "hovedbok_maaned_nok",
             "budsjett_maaned_nok",

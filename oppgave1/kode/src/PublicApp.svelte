@@ -7,6 +7,7 @@
   let rows = [];
   let sourceMetadata = [];
   let sectionCode = 'all';
+  let yearKey = 'latest';
   let periodKey = 'latest';
 
   const loadLocalData = async (selection) => {
@@ -14,6 +15,7 @@
     rows = loaded.rows;
     sourceMetadata = loaded.metadata;
     sectionCode = 'all';
+    yearKey = 'latest';
     periodKey = 'latest';
     dataReady = true;
   };
@@ -23,7 +25,12 @@
     label: String(row.section_label),
     sort: Number(row.section_sort ?? 0)
   }])).values()].sort((left, right) => left.sort - right.sort);
-  $: periods = [...new Map(rows.map((row) => [String(row.end_period), {
+  $: years = [...new Set(rows.map((row) => Number(row.period_year)).filter(Number.isFinite))]
+    .sort((left, right) => right - left);
+  $: effectiveYear = yearKey === 'latest' ? years[0] : Number(yearKey);
+  $: periods = [...new Map(rows
+    .filter((row) => Number(row.period_year) === effectiveYear)
+    .map((row) => [String(row.end_period), {
     value: String(row.end_period),
     label: String(row.period_label),
     sort: Number(row.period_sort ?? row.end_period)
@@ -57,8 +64,15 @@
           {#each sections as section}<option value={section.value}>{section.label}</option>{/each}
         </select>
       </label>
+      <label class="public-picker year-picker">
+        <span>År</span>
+        <select aria-label="År" bind:value={yearKey} on:change={() => (periodKey = 'latest')}>
+          <option value="latest">Nyaste · {years[0]}</option>
+          {#each years as year}<option value={String(year)}>{year}</option>{/each}
+        </select>
+      </label>
       <label class="public-picker period-picker">
-        <span>Rapportperiode</span>
+        <span>Til og med</span>
         <select role="combobox" aria-label="Rapportperiode" bind:value={periodKey}>
           <option value="latest">Siste tilgjengelige · {periods[0]?.label?.toLocaleLowerCase('nb-NO')}</option>
           {#each periods as period}<option value={period.value}>{period.label}</option>{/each}

@@ -89,18 +89,37 @@ class Task2MissingCashTest(unittest.TestCase):
 
 
 class Task2LatestPeriodTest(unittest.TestCase):
-    def test_latest_complete_period_excludes_partial_july(self) -> None:
-        self.assertEqual(latest_complete_ledger_period(), 202606)
+    def test_latest_complete_period_matches_snapshot(self) -> None:
+        expected = 202608 if CONTRACT.test_data_root else 202606
+        self.assertEqual(latest_complete_ledger_period(), expected)
 
 
 class Task2ReportPeriodTest(unittest.TestCase):
     def test_january_to_june_budget_is_sum_of_first_six_months(self) -> None:
         rows_path = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
-        month_columns = [f"budsjett_20260{month}_tusen" for month in range(1, 7)]
-        month_sum = " + ".join(f"coalesce({column}, 0)" for column in month_columns)
 
         connection = duckdb.connect()
         try:
+            columns = {
+                row[0]
+                for row in connection.execute(
+                    f"describe select * from read_parquet('{rows_path.as_posix()}')"
+                ).fetchall()
+            }
+            if "report_year" in columns:
+                month_columns = [f"budsjett_{month:02d}_tusen" for month in range(1, 7)]
+                period_filter = (
+                    "report_year = 2026 and period_to = 202606 "
+                    "and section_code = 'all'"
+                )
+            else:
+                month_columns = [
+                    f"budsjett_20260{month}_tusen" for month in range(1, 7)
+                ]
+                period_filter = "rapportperiode = 'p1_6'"
+            month_sum = " + ".join(
+                f"coalesce({column}, 0)" for column in month_columns
+            )
             errors, checked = connection.execute(
                 f"""
                 select
@@ -109,7 +128,7 @@ class Task2ReportPeriodTest(unittest.TestCase):
                   ) as errors,
                   count(*) as checked
                 from read_parquet('{rows_path.as_posix()}')
-                where rapportperiode = 'p1_6'
+                where {period_filter}
                   and row_type in ('account', 'group', 'total')
                 """
             ).fetchone()
@@ -123,18 +142,35 @@ class Task2ReportPeriodTest(unittest.TestCase):
         rows_path = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
         connection = duckdb.connect()
         try:
+            columns = {
+                row[0]
+                for row in connection.execute(
+                    f"describe select * from read_parquet('{rows_path.as_posix()}')"
+                ).fetchall()
+            }
+            if "report_year" in columns:
+                totals_filter = "row_type = 'account'"
+                join_keys = """
+                  and investment.section_code = report.section_code
+                  and investment.period_to = report.period_to
+                  and investment.konto = report.konto
+                """
+            else:
+                totals_filter = "radtekst = 'Driftskostnader'"
+                join_keys = ""
             mismatches = connection.execute(
                 f"""
                 with totals as (
                   select *
                   from read_parquet('{rows_path.as_posix()}')
-                  where radtekst = 'Driftskostnader'
+                  where {totals_filter}
                 )
                 select count(*)
                 from totals report
                 join totals investment
                   on investment.finansiering = '154345'
                  and investment.rapportperiode = report.rapportperiode
+                 {join_keys}
                 where report.finansiering in ('154345', 'alle')
                   and (
                     abs(report.investeringsbudsjett_tusen - investment.virksomhet_budsjett_tusen) > 0.00001

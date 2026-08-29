@@ -11,8 +11,10 @@ from openpyxl import load_workbook
 
 try:
     from .project_data import task2_sources
+    from .parquet_report import ParquetReportSources, build_parquet_report
 except ImportError:
     from project_data import task2_sources
+    from parquet_report import ParquetReportSources, build_parquet_report
 
 
 CODE_ROOT = Path(__file__).resolve().parents[1]
@@ -1008,12 +1010,35 @@ def main() -> None:
         temp_db.unlink()
     conn = duckdb.connect(temp_db)
     try:
-        parquet_outputs = [
-            ("account_groups", account_groups(conn)),
-            ("grouped_finance_rows", grouped_finance_rows(conn)),
-            ("section_grouped_finance_rows", section_grouped_finance_rows(conn)),
-            ("grouped_finance_validation", grouped_finance_validation(conn)),
-        ]
+        if SOURCES.cash_ledger and SOURCES.cash_accounts and SOURCES.account_plan:
+            groups, report, validations = build_parquet_report(
+                ParquetReportSources(
+                    ledger=SOURCES.ledger,
+                    budget_header=SOURCES.budget_header,
+                    budget_values=SOURCES.budget_values,
+                    dimension_values=SOURCES.dimension_values,
+                    cash_ledger=SOURCES.cash_ledger,
+                    cash_accounts=SOURCES.cash_accounts,
+                    account_plan=SOURCES.account_plan,
+                )
+            )
+            groups_path = write_parquet(conn, "account_groups", groups)
+            report_path = write_parquet(conn, "grouped_finance_rows", report[report.section_code == "all"])
+            section_path = write_parquet(conn, "section_grouped_finance_rows", report[report.section_code != "all"])
+            validation_path = write_parquet(conn, "grouped_finance_validation", validations)
+            parquet_outputs = [
+                ("account_groups", groups_path),
+                ("grouped_finance_rows", report_path),
+                ("section_grouped_finance_rows", section_path),
+                ("grouped_finance_validation", validation_path),
+            ]
+        else:
+            parquet_outputs = [
+                ("account_groups", account_groups(conn)),
+                ("grouped_finance_rows", grouped_finance_rows(conn)),
+                ("section_grouped_finance_rows", section_grouped_finance_rows(conn)),
+                ("grouped_finance_validation", grouped_finance_validation(conn)),
+            ]
     finally:
         conn.close()
         for suffix in ("", ".wal"):

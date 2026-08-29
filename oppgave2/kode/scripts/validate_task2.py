@@ -19,9 +19,100 @@ ROWS_PARQUET = GENERATED_DIR / "grouped_finance_rows.parquet"
 SECTION_ROWS_PARQUET = GENERATED_DIR / "section_grouped_finance_rows.parquet"
 
 
+def validate_multiyear_parquet_report() -> bool:
+    conn = duckdb.connect()
+    try:
+        columns = {
+            row[0]
+            for row in conn.execute(
+                f"describe select * from read_parquet('{ROWS_PARQUET.as_posix()}')"
+            ).fetchall()
+        }
+        if "report_year" not in columns:
+            return False
+        coverage = conn.execute(
+            f"""
+            select
+              min(rapportperiode) as min_period,
+              max(rapportperiode) as max_period,
+              count(distinct report_year) as report_years,
+              count(distinct finansiering) as financings,
+              count(*) filter (where row_type = 'account') as account_rows,
+              count(*) filter (where row_type = 'account' and kontant_tusen is not null) as cash_rows,
+              count(*) filter (
+                where row_type = 'account'
+                  and report_year = 2025
+                  and abs(aarets_budsjett_tusen) > 0.00001
+              ) as budget_2025_rows
+            from read_parquet('{ROWS_PARQUET.as_posix()}')
+            """
+        ).fetchone()
+        section_cash_rows = conn.execute(
+            f"""
+            select count(*)
+            from read_parquet('{SECTION_ROWS_PARQUET.as_posix()}')
+            where row_type = 'account' and kontant_tusen is not null
+            """
+        ).fetchone()[0]
+        errors = conn.execute(
+            f"""
+            select count(*)
+            from read_parquet('{VALIDATION_PARQUET.as_posix()}')
+            where status = 'error'
+            """
+        ).fetchone()[0]
+        cash_reconciliation = conn.execute(
+            f"""
+            with generated as (
+              select kontant_tusen
+              from read_parquet('{ROWS_PARQUET.as_posix()}')
+              where section_code = 'all'
+                and finansiering = '154345'
+                and rapportperiode = '202604'
+                and row_type = 'account'
+                and konto = '6710'
+            ), source as (
+              select sum(try_cast(cash_amount as double)) / 1000.0 as kontant_tusen
+              from read_parquet('{SOURCES.cash_ledger.as_posix()}')
+              where trim(dim_4) = '154345'
+                and trim(account) = '6710'
+                and try_cast(pay_period as integer) between 202601 and 202604
+            )
+            select abs(generated.kontant_tusen - source.kontant_tusen)
+            from generated cross join source
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+
+    min_period, max_period, years, financings, accounts, cash_rows, budget_2025 = coverage
+    if (min_period, max_period, years) != ("202401", "202608", 3):
+        raise SystemExit(
+            f"Uventa periode-/årsdekning: {min_period}–{max_period}, {years} år"
+        )
+    if financings != 4 or accounts == 0:
+        raise SystemExit("Fleirårsrapporten manglar finansieringsval eller kontorader")
+    if cash_rows == 0 or section_cash_rows == 0:
+        raise SystemExit("Kontantrekneskapen manglar for alle-syn eller seksjonar")
+    if budget_2025 == 0:
+        raise SystemExit("2025-budsjettet er tomt; amount1 er ikkje lese")
+    if errors:
+        raise SystemExit(f"Datakontroll feilet med {errors} feil")
+    if cash_reconciliation is None or cash_reconciliation[0] > 0.000001:
+        raise SystemExit("Kontantrekneskapen avstemmer ikkje mot pay_period i acatrans")
+    print(
+        f"Oppgave 2-validering bestått: {min_period}–{max_period}, "
+        f"{accounts} kontorader og {cash_rows + section_cash_rows} kontantrader"
+    )
+    return True
+
+
 def main() -> None:
     if not VALIDATION_PARQUET.exists() or not ROWS_PARQUET.exists() or not SECTION_ROWS_PARQUET.exists():
         raise SystemExit("Genererte oppgave 2-data mangler. Kjør npm run prepare:data først.")
+
+    if validate_multiyear_parquet_report():
+        return
 
     conn = duckdb.connect()
     try:

@@ -2,6 +2,8 @@
   "schema_version": 1,
   "snapshot_id": "2026-08-23",
   "data_root_env": "REGNSKAP_DATA_ROOT",
+  "test_snapshot_id": "2026-08-29-february-repaired",
+  "test_data_root_env": "REGNSKAP_TEST_DATA_ROOT",
   "datasets": {
     "common.ledger": {
       "path": "snapshots/2026-08-23/operative/common/agltransact.parquet",
@@ -121,6 +123,106 @@
       "role": "fasit",
       "classification": "confidential",
       "sha256": "4ba68c95f08d1621d1bc1ff661e348cf1a9395f8933e6e7540a94429a56e088e"
+    }
+  },
+  "test_datasets": {
+    "common.ledger": {
+      "path": "snapshots/2026-08-29-february-repaired/agltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "56efaa5056b106d5fec611e70613142139091813037039f0c808427ec910477c"
+    },
+    "common.budget_header": {
+      "path": "apltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "e5a05fbb4a3575f8ff0a3f3eb0e379fc51733039e2f1dd5a4973d748fbdd4d28"
+    },
+    "common.budget_values": {
+      "path": "apltransactvalue.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "1927be615fc8c094aeb69abd8573773a4fa40aed388f57df60e5bd49360b243e"
+    },
+    "common.dimension_values": {
+      "path": "agldimvalue.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "4f885539eb0c47943c98fd506ef9a0b866d34fb613cd84ec1633b5f95fc2b60a"
+    },
+    "common.cash_ledger": {
+      "path": "acatrans.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "50028eee347be00f8e6531a99254c8c48d9ce579901a0584a34fb6c3ce13581b"
+    },
+    "common.cash_accounts": {
+      "path": "acaaccounts.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "4542aebf20d97f40f252415d0015eaba604839f904ae938e36db15c0832ca574"
+    },
+    "common.receivables": {
+      "path": "acrtrans.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "8682aa73f965fa265c6135fc98f12b5885d7e6a958dabf589361fac31213ac77"
+    },
+    "common.ledger_map": {
+      "path": "agltransactmap.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "cb26541786fcca4a73dcad6fb12c537f0284151bd868d223bf5920185d123585"
+    },
+    "common.account_plan": {
+      "path": "nkom_kontoplan.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "47cddb93873a9e7823afa55459f35feac0ad490b0cc6749a25d160307d2918b9"
+    },
+    "task1.dimension_values": {
+      "path": "agldimvalue.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "4f885539eb0c47943c98fd506ef9a0b866d34fb613cd84ec1633b5f95fc2b60a"
+    },
+    "task1.budget_versions": {
+      "path": "aplversion.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "8509f41071cbea49013d3e4708b01c0fd6c211a6ee4fc9aa1d9cf79c55277b09"
+    },
+    "task1.account_plan": {
+      "path": "nkom_kontoplan.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "47cddb93873a9e7823afa55459f35feac0ad490b0cc6749a25d160307d2918b9"
+    },
+    "task3.workflow": {
+      "path": "awftaskfin.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "restricted",
+      "sha256": "d99a9f5418071dbe2ed09b084fc18189754f19684ace385250631826fe9e1f3e"
+    },
+    "task3.invoice_queue_history": {
+      "path": "a47en53invoicequeuehistr.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "restricted",
+      "sha256": "76d60d4b4a7cf6cefd26cc30f2b2663226d59c4dcc194336935648a1c04417b5"
     }
   }
 }

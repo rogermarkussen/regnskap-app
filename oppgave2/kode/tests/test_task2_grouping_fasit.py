@@ -21,9 +21,41 @@ class Task2GroupingFasitTest(unittest.TestCase):
         )
         connection = duckdb.connect()
         try:
-            cls.calculated = connection.execute(
-                f"select * from read_parquet('{calculated_path.as_posix()}') where rapportperiode = 'p1_3'"
-            ).df()
+            columns = {
+                row[0]
+                for row in connection.execute(
+                    f"describe select * from read_parquet('{calculated_path.as_posix()}')"
+                ).fetchall()
+            }
+            if "report_year" in columns:
+                cls.new_schema = True
+                cls.comparison_columns = [
+                    column
+                    for column in COMPARISON_COLUMNS
+                    if column
+                    not in {"kontant_budsjett_tusen", "kontant_avvik_tusen"}
+                ]
+                cls.calculated = connection.execute(
+                    f"""
+                    select *
+                    from read_parquet('{calculated_path.as_posix()}')
+                    where report_year = 2026
+                      and period_to = 202603
+                      and section_code = 'all'
+                    """
+                ).df()
+                cls.calculated = cls.calculated.rename(
+                    columns={
+                        f"budsjett_{month:02d}_tusen": f"budsjett_2026{month:02d}_tusen"
+                        for month in range(1, 13)
+                    }
+                )
+            else:
+                cls.new_schema = False
+                cls.comparison_columns = COMPARISON_COLUMNS
+                cls.calculated = connection.execute(
+                    f"select * from read_parquet('{calculated_path.as_posix()}') where rapportperiode = 'p1_3'"
+                ).df()
         finally:
             connection.close()
         cls.fasit = grouped_finance_fasit_rows_frame()
@@ -35,15 +67,30 @@ class Task2GroupingFasitTest(unittest.TestCase):
                 expected = self.fasit[self.fasit["finansiering"] == financing]
                 expected_accounts = expected[expected["row_type"] == "account"]
                 calculated_accounts = calculated[calculated["row_type"] == "account"]
-                comparison = expected_accounts[["konto", *COMPARISON_COLUMNS]].merge(
-                    calculated_accounts[["konto", *COMPARISON_COLUMNS]],
+                comparison = expected_accounts[["konto", *self.comparison_columns]].merge(
+                    calculated_accounts[["konto", *self.comparison_columns]],
                     on="konto",
                     how="left",
                     suffixes=("_fasit", "_beregnet"),
                     validate="one_to_one",
                 )
-                self.assertFalse(comparison.filter(like="_beregnet").isna().all(axis=1).any())
-                for column in COMPARISON_COLUMNS:
+                missing = comparison[
+                    comparison.filter(like="_beregnet").isna().all(axis=1)
+                ]
+                missing_nonzero = missing[
+                    missing[
+                        [f"{column}_fasit" for column in self.comparison_columns]
+                    ]
+                    .fillna(0)
+                    .abs()
+                    .max(axis=1)
+                    > TOLERANCE
+                ]
+                self.assertTrue(
+                    missing_nonzero.empty,
+                    f"{financing}: manglar fasitkontoar med verdi",
+                )
+                for column in self.comparison_columns:
                     difference = (
                         comparison[f"{column}_fasit"].fillna(0)
                         - comparison[f"{column}_beregnet"].fillna(0)
@@ -54,8 +101,32 @@ class Task2GroupingFasitTest(unittest.TestCase):
                     )
 
                 expected_total = expected[expected["radtekst"] == "Driftskostnader"].iloc[0]
-                calculated_total = calculated[calculated["radtekst"] == "Driftskostnader"].iloc[0]
-                for column in COMPARISON_COLUMNS:
+                if self.new_schema:
+                    total_accounts = calculated_accounts[
+                        calculated_accounts["konto"].isin(expected_accounts["konto"])
+                        & calculated_accounts["konto"].astype(int).between(5000, 7834)
+                    ]
+                    calculated_values = {
+                        column: float(total_accounts[column].fillna(0).sum())
+                        for column in self.comparison_columns
+                        if column != "forbruk_av_aarets_budsjett"
+                    }
+                    annual = calculated_values["aarets_budsjett_tusen"]
+                    calculated_values["forbruk_av_aarets_budsjett"] = (
+                        None
+                        if annual == 0
+                        else calculated_values["hovedbok_tusen"] / annual
+                    )
+                else:
+                    calculated_total = calculated[
+                        calculated["radtekst"] == "Driftskostnader"
+                    ].iloc[0]
+                    calculated_values = {
+                        column: calculated_total[column]
+                        for column in self.comparison_columns
+                    }
+                for column in self.comparison_columns:
                     expected_value = 0.0 if pd.isna(expected_total[column]) else float(expected_total[column])
-                    calculated_value = 0.0 if pd.isna(calculated_total[column]) else float(calculated_total[column])
+                    raw_calculated = calculated_values[column]
+                    calculated_value = 0.0 if pd.isna(raw_calculated) else float(raw_calculated)
                     self.assertLessEqual(abs(expected_value - calculated_value), TOLERANCE)

@@ -27,6 +27,7 @@
     "build:internal": "npm run check:data && npm run build:task1 && npm run build:task2 && npm run build:task3",
     "build": "npm run build:internal",
     "test:local-folder": "node --test tests/local_data_folder.test.mjs",
+    "test:data-folder": "REGNSKAP_TEST_DATA_ROOT=$PWD/data npm run check:data && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave1/kode run prepare:data && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave1/kode run validate && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave2/kode run prepare:data && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave2/kode run validate && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave3 run prepare:data && REGNSKAP_TEST_DATA_ROOT=$PWD/data npm --prefix oppgave3 run validate",
     "test": "npm run check:data && npm run test:contract && npm run test:local-folder && npm --prefix oppgave1/kode test && npm --prefix oppgave2/kode test && npm --prefix oppgave3 test"
   },
   "engines": { "node": ">=22 <23" }

@@ -31,6 +31,38 @@ Sett en annen datarot slik:
 export REGNSKAP_DATA_ROOT=/sikker/plassering/Regnskap-data
 ```
 
+## Lokal testmappe med rå Parquet-filer
+
+Den flate `data/`-mappa i arbeidskopien er ignorert av versjonskontroll og kan
+brukes som komplett, lokalt testgrunnlag. Ho overstyrer berre kjeldene som er
+oppførte under `test_datasets` i manifestet. Fasit og Excel-mal blir framleis
+lesne frå den ordinære, separate datarota.
+
+Køyr alle tre databygg og kontrollar frå repositoryrota:
+
+```bash
+npm run test:data-folder
+```
+
+Kommandoen skriv avleidde filer under
+`data/generated/2026-08-29-february-repaired/`. Etterpå kan den same `data/`-mappa veljast
+i oppgåve 1, 2 og 3. Mappeveljaren leitar rekursivt og finn dei
+oppgåvespesifikke Parquet-filene utan at rådata blir kopierte inn i appane eller
+bygga.
+
+Hovudbokssnapshotet bruker den komplette, avstemte perioden `202602` frå
+snapshot `2026-08-23` og alle andre periodar frå den lokale dataleveransen.
+Den opphavlege lokale hovudboksfila er ikkje overskriven. Det samanslåtte,
+ZSTD-komprimerte snapshotet ligg under
+`data/snapshots/2026-08-29-february-repaired/` og er kjelda manifestet peikar på.
+
+Testmappa inneheld hovudbok for 2024–2026, budsjettversjonane for dei same åra,
+kontantposteringar periodiserte med `acatrans.pay_period`, kontoplan,
+dimensjonsregister, reskontro, fakturakø, bilagskart og workflowhistorikk.
+Kontantbudsjett er framleis eit dokumentert datagap. Ingen av Parquet-kjeldene
+har ein eigen, periodisert kontantbudsjettserie. Appen viser derfor operativt
+kontantrekneskap, men held kontantbudsjett og kontantavvik tomme.
+
 ## Datakontrakten
 
 [`data-manifest.json`](data-manifest.json) er den eneste autoritative
@@ -62,9 +94,10 @@ Operative data er eneste beregningskilde for publiserte tall. Fasit har rollen
 `fasit` og leses bare fra tester og kontrollrapporter. Produksjonsbygg skal ikke
 lese fasit og skal aldri bruke den som reserveverdi.
 
-Oppgave 2 har fortsatt tre operative Excel-avhengigheter. De er merket
-`operative-temporary` i manifestet og skal erstattes av autoritative Parquet-
-kilder når disse blir tilgjengelige.
+Oppgåve 2 bruker dei tre eldre Excel-kjeldene berre for den gamle
+produksjonssnapshoten. Når `REGNSKAP_TEST_DATA_ROOT` er sett, blir kontoplan,
+hovudbok, budsjett og kontantrekneskap bygde frå Parquet. Fasit blir berre brukt
+i den separate avstemmingstesten.
 
 ## Genererte filer
 

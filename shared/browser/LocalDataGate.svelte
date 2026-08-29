@@ -45,7 +45,7 @@
     <div class="gate-mark" aria-hidden="true"><span></span><span></span><span></span></div>
     <p class="eyebrow">{taskLabel}</p>
     <h1 id="local-data-title">Velg lokal datamappe</h1>
-    <p class="intro">Rapporten starter uten data. Velg mappen som inneholder de beregnede Parquet-filene for denne oppgaven.</p>
+    <p class="intro">Rapporten starter uten data. Velg testmappen eller den oppgavespesifikke mappen med beregnede Parquet-filer.</p>
 
     <button type="button" on:click={chooseFolder} disabled={loading}>
       {loading ? 'Leser mappen…' : 'Velg datamappe'}
