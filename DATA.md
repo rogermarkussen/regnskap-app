@@ -33,35 +33,34 @@ export REGNSKAP_DATA_ROOT=/sikker/plassering/Regnskap-data
 
 ## Lokal testmappe med rå Parquet-filer
 
-Den flate `data/`-mappa i arbeidskopien er ignorert av versjonskontroll og kan
-brukes som komplett, lokalt testgrunnlag. Ho overstyrer berre kjeldene som er
-oppførte under `test_datasets` i manifestet. Fasit og Excel-mal blir framleis
-lesne frå den ordinære, separate datarota.
+Den flate `data/`-mappen i arbeidskopien er ignorert av versjonskontroll og kan
+brukes som komplett, lokalt testgrunnlag. Den overstyrer bare kildene som er
+oppført under `test_datasets` i manifestet. Fasit og Excel-mal leses fortsatt
+fra den ordinære, separate dataroten.
 
-Køyr alle tre databygg og kontrollar frå repositoryrota:
+Kjør alle tre databygg og kontroller fra repositoryroten:
 
 ```bash
 npm run test:data-folder
 ```
 
-Kommandoen skriv avleidde filer under
-`data/generated/2026-08-29-february-repaired/`. Etterpå kan den same `data/`-mappa veljast
-i oppgåve 1, 2 og 3. Mappeveljaren leitar rekursivt og finn dei
-oppgåvespesifikke Parquet-filene utan at rådata blir kopierte inn i appane eller
-bygga.
+De offentlige appene bruker ikke disse avledede filene. Brukeren velger i stedet
+én felles, flat mappe som inneholder nøyaktig de 12 operative Parquet-filene.
+Alle tre appene validerer den samme fillisten og beregner rapportgrunnlaget
+lokalt i nettleseren. Eksempel på lokal mappe er `korrekt-data/`.
 
-Hovudbokssnapshotet bruker den komplette, avstemte perioden `202602` frå
-snapshot `2026-08-23` og alle andre periodar frå den lokale dataleveransen.
-Den opphavlege lokale hovudboksfila er ikkje overskriven. Det samanslåtte,
-ZSTD-komprimerte snapshotet ligg under
-`data/snapshots/2026-08-29-february-repaired/` og er kjelda manifestet peikar på.
+Hovedbokssnapshotet bruker den komplette, avstemte perioden `202602` fra
+snapshot `2026-08-23` og alle andre perioder fra den lokale dataleveransen.
+Den opprinnelige lokale hovedboksfilen er ikke overskrevet. Det sammenslåtte,
+ZSTD-komprimerte snapshotet ligger under
+`data/snapshots/2026-08-29-february-repaired/` og er kilden manifestet peker på.
 
-Testmappa inneheld hovudbok for 2024–2026, budsjettversjonane for dei same åra,
-kontantposteringar periodiserte med `acatrans.pay_period`, kontoplan,
+Testmappen inneholder hovedbok for 2024–2026, budsjettversjonene for de samme
+årene, kontantposteringer periodisert med `acatrans.pay_period`, kontoplan,
 dimensjonsregister, reskontro, fakturakø, bilagskart og workflowhistorikk.
-Kontantbudsjett er framleis eit dokumentert datagap. Ingen av Parquet-kjeldene
-har ein eigen, periodisert kontantbudsjettserie. Appen viser derfor operativt
-kontantrekneskap, men held kontantbudsjett og kontantavvik tomme.
+Kontantbudsjett er fortsatt et dokumentert datagap. Ingen av Parquet-kildene
+har en egen, periodisert kontantbudsjettserie. Appen viser derfor operativt
+kontantregnskap, men holder kontantbudsjett og kontantavvik tomme.
 
 ## Datakontrakten
 
@@ -94,10 +93,10 @@ Operative data er eneste beregningskilde for publiserte tall. Fasit har rollen
 `fasit` og leses bare fra tester og kontrollrapporter. Produksjonsbygg skal ikke
 lese fasit og skal aldri bruke den som reserveverdi.
 
-Oppgåve 2 bruker dei tre eldre Excel-kjeldene berre for den gamle
-produksjonssnapshoten. Når `REGNSKAP_TEST_DATA_ROOT` er sett, blir kontoplan,
-hovudbok, budsjett og kontantrekneskap bygde frå Parquet. Fasit blir berre brukt
-i den separate avstemmingstesten.
+Oppgave 2 bruker de tre eldre Excel-kildene bare for det gamle
+produksjonssnapshotet. Når `REGNSKAP_TEST_DATA_ROOT` er satt, bygges kontoplan,
+hovedbok, budsjett og kontantregnskap fra Parquet. Fasit brukes bare i den
+separate avstemmingstesten.
 
 ## Genererte filer
 
@@ -106,11 +105,6 @@ Databygg skriver til:
 ```text
 $REGNSKAP_DATA_ROOT/generated/<snapshot-id>/<oppgave>/
 ```
-
-Manifestet kan angi en nyere, oppgavespesifikk ID under
-`generated_snapshot_ids` eller `test_generated_snapshot_ids`. Dette brukes når
-én oppgave må bygges på nytt uten å overskrive eller flytte leveransene til de
-andre oppgavene.
 
 Hver app lager et regenererbart statisk `build/`. Oppgave 1 lager i tillegg en
 lokal DuckDB for Evidence. Oppgave 2 bygger én avledet, ZSTD-komprimert
@@ -122,8 +116,8 @@ bygg skal ikke inneholde datafiler.
 ## Hosting
 
 Alle tre appene kan publiseres som datafrie grensesnitt på GitHub Pages. En
-offentlig app starter tom og krever at brukeren velger den oppgavespesifikke
-mappen med genererte Parquet-filer på egen maskin. Filene leses lokalt i
+offentlig app starter tom og krever at brukeren velger den samme lokale mappen
+med de 12 operative Parquet-filene. Filene leses og beregnes lokalt i
 nettleserfanen, lastes ikke opp og lagres ikke i nettleseren. En ny sideåpning
 krever derfor et nytt mappevalg.
 

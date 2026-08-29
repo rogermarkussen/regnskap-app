@@ -50,6 +50,168 @@ const METRIC_RULES = [
   }
 ];
 
+const validPeriod = (value) => /^20\d{2}(0[1-9]|1[0-2])$/.test(text(value));
+
+export const buildSectionDashboardRowsFromSources = ({
+  actualRows,
+  budgetHeaderRows,
+  budgetValueRows,
+  dimensionRows
+}) => {
+  const actual = actualRows
+    .map((row) => ({
+      account: text(row.account),
+      dim_4: text(row.dim_4),
+      dim_2: text(row.dim_2),
+      section_code: text(row.dim_1) || '__missing__',
+      period: text(row.period),
+      amount_tusen: (number(row.amount) ?? 0) / 1000
+    }))
+    .filter((row) => validPeriod(row.period));
+
+  const headers = new Map(budgetHeaderRows.map((row) => [text(row.trans_id), row]));
+  const budget = budgetValueRows.flatMap((valueRow) => {
+    const header = headers.get(text(valueRow.trans_id));
+    const period = text(valueRow.period);
+    if (!header || !validPeriod(period) || text(header.version) !== `${period.slice(0, 4)}B`) return [];
+    return [{
+      account: text(header.account),
+      dim_2: text(header.dim_2),
+      section_code: text(header.dim_1) || '__missing__',
+      financing: budgetFinancing(header.dim_1),
+      period,
+      amount_tusen: number(valueRow.amount) ?? number(valueRow.amount1) ?? 0
+    }].map((row) => ({ ...row, amount_tusen: row.amount_tusen / 1000 }));
+  });
+
+  const names = new Map(dimensionRows
+    .filter((row) => text(row.attribute_id) === 'C1' && text(row.dim_value))
+    .map((row) => [text(row.dim_value), text(row.description)]));
+  const sectionCodes = [...new Set([
+    ...actual.map((row) => row.section_code),
+    ...budget.map((row) => row.section_code)
+  ])].sort((left, right) => {
+    if (left === '__missing__') return 1;
+    if (right === '__missing__') return -1;
+    return (Number(left) || 90_000) - (Number(right) || 90_000) || left.localeCompare(right, 'nb-NO');
+  });
+  const sections = [
+    { code: 'all', name: 'Alle kostnadssteder', label: 'Alle kostnadssteder', sort: 0 },
+    ...sectionCodes.map((code) => ({
+      code,
+      name: code === '__missing__' ? 'Uten kostnadsstedskode' : names.get(code) || 'Navn mangler i dimensjonsregisteret',
+      label: code === '__missing__'
+        ? 'Uten kostnadsstedskode'
+        : `${code} · ${names.get(code) || 'Navn mangler i dimensjonsregisteret'}`,
+      sort: code === '__missing__' ? 99_999 : Number(code) || 90_000
+    }))
+  ];
+  const periods = [...new Set(actual.map((row) => row.period))].sort();
+  const latestPeriod = periods.at(-1);
+  const actualByScope = new Map();
+  const budgetByScope = new Map();
+  const addToScope = (map, scope, financing, row) => {
+    const scopeKey = `${scope}|${financing}`;
+    if (!map.has(scopeKey)) map.set(scopeKey, []);
+    map.get(scopeKey).push(row);
+  };
+  for (const row of actual) {
+    const financing = ['154322', '045101'].includes(row.dim_4) ? '154322+045101' : row.dim_4;
+    addToScope(actualByScope, 'all', financing, row);
+    addToScope(actualByScope, row.section_code, financing, row);
+  }
+  for (const row of budget) {
+    addToScope(budgetByScope, 'all', row.financing, row);
+    addToScope(budgetByScope, row.section_code, row.financing, row);
+  }
+  const result = [];
+
+  for (const section of sections) {
+    for (const endPeriod of periods) {
+      const year = Number(endPeriod.slice(0, 4));
+      const month = Number(endPeriod.slice(4));
+      const startPeriod = `${year}01`;
+      for (const rule of METRIC_RULES) {
+        const actualScope = (actualByScope.get(`${section.code}|${rule.financing}`) ?? []).filter((row) =>
+          row.period >= startPeriod
+          && row.period <= endPeriod
+          && (!rule.project || row.dim_2 === rule.project)
+        );
+        const common = {
+          section_code: section.code,
+          section_name: section.name,
+          section_label: section.label,
+          section_sort: section.sort,
+          period_key: endPeriod,
+          end_period: endPeriod,
+          period_year: year,
+          period_month: month,
+          period_label: new Intl.DateTimeFormat('nb-NO', { month: 'long', year: 'numeric' })
+            .format(new Date(year, month - 1, 1)).replace(/^./, (letter) => letter.toLocaleUpperCase('nb-NO')),
+          period_sort: Number(endPeriod),
+          is_latest_period: endPeriod === latestPeriod,
+          budsjettversjon: `${year}B`,
+          finansiering: rule.financing,
+          metric: rule.metric,
+          tittel: rule.title,
+          beregningsregel: calculationRule(rule),
+          regelversjon: BUSINESS_RULE_VERSION,
+          kilde_hovedbok: 'agltransact.parquet',
+          kilde_budsjett: 'apltransact.parquet + apltransactvalue.parquet, opprinnelig budsjett for valgt år'
+        };
+
+        if (rule.ratioNumerator && rule.ratioDenominator) {
+          const numerator = ratioSum(actualScope, rule.ratioNumerator);
+          const denominator = ratioSum(actualScope, rule.ratioDenominator);
+          const ratio = denominator ? numerator / denominator : null;
+          const details = [
+            { label: 'Lønnskostnader', value: numerator },
+            { label: 'Totale kostnader', value: denominator }
+          ];
+          if (ratio !== null) details.push({ label: 'Andel (%)', value: ratio * 100, format: 'pct' });
+          result.push({
+            ...common,
+            hovedbok_nok1000: ratio,
+            budsjett_nok1000: null,
+            budsjettandel: null,
+            status: null,
+            status_tekst: null,
+            prosentverdi: ratio,
+            gjenstaar_nok1000: ratio === null ? null : -ratio,
+            kommentar: null,
+            grunnlag_json: JSON.stringify(details)
+          });
+          continue;
+        }
+
+        const actualSelected = actualScope.filter((row) => accountMatches(row, rule));
+        const budgetSelected = (budgetByScope.get(`${section.code}|${rule.financing}`) ?? []).filter((row) =>
+          row.period >= startPeriod
+          && row.period <= endPeriod
+          && (!rule.project || row.dim_2 === rule.project)
+          && accountMatches(row, rule)
+        );
+        const actualTotal = sumAmounts(actualSelected);
+        const budgetTotal = budgetSelected.length ? sumAmounts(budgetSelected) : null;
+        const [budgetShare, rowStatus, statusText] = status(actualTotal, budgetTotal);
+        result.push({
+          ...common,
+          hovedbok_nok1000: actualTotal,
+          budsjett_nok1000: budgetTotal,
+          budsjettandel: budgetShare,
+          status: rowStatus,
+          status_tekst: statusText,
+          prosentverdi: null,
+          gjenstaar_nok1000: budgetTotal === null ? null : budgetTotal - actualTotal,
+          kommentar: budgetTotal === null ? 'Mangler budsjett' : null,
+          grunnlag_json: JSON.stringify(actualDetails(actualSelected))
+        });
+      }
+    }
+  }
+  return result;
+};
+
 export const KPI_UPLOAD_DEFINITIONS = METRIC_RULES.map((rule) => ({
   financing: rule.financing,
   title: rule.title,

@@ -1,5 +1,20 @@
 const normalizePath = (value) => String(value ?? '').replaceAll('\\', '/').replace(/^\/+/, '');
 
+export const COMMON_DATA_FILES = Object.freeze([
+  'a47en53invoicequeuehistr.parquet',
+  'acaaccounts.parquet',
+  'acatrans.parquet',
+  'acrtrans.parquet',
+  'agldimvalue.parquet',
+  'agltransact.parquet',
+  'agltransactmap.parquet',
+  'apltransact.parquet',
+  'apltransactvalue.parquet',
+  'aplversion.parquet',
+  'awftaskfin.parquet',
+  'nkom_kontoplan.parquet'
+]);
+
 const fileRecord = (file, path) => ({
   file,
   path: normalizePath(path || file?.webkitRelativePath || file?.name)
@@ -38,6 +53,18 @@ export const requireLocalFiles = (selection, requiredNames) => {
     );
   }
   return resolved;
+};
+
+export const requireCommonDataFiles = (selection) => {
+  const files = requireLocalFiles(selection, COMMON_DATA_FILES);
+  const expected = new Set(COMMON_DATA_FILES);
+  const unexpected = [...selection.byName.keys()]
+    .filter((name) => name.toLocaleLowerCase('nb-NO').endsWith('.parquet') && !expected.has(name))
+    .sort((left, right) => left.localeCompare(right, 'nb-NO'));
+  if (unexpected.length) {
+    throw new Error(`Mappen inneholder ukjente Parquet-filer: ${unexpected.join(', ')}`);
+  }
+  return files;
 };
 
 const collectDirectoryFiles = async (directory, prefix = '') => {

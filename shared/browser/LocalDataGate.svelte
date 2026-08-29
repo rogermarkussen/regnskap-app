@@ -46,7 +46,7 @@
     <div class="gate-mark" aria-hidden="true"><span></span><span></span><span></span></div>
     <p class="eyebrow">{taskLabel}</p>
     <h1 id="local-data-title">Velg lokal datamappe</h1>
-    <p class="intro">Rapporten starter uten data. Velg testmappen eller den oppgavespesifikke mappen med beregnede Parquet-filer.</p>
+    <p class="intro">Velg den felles datamappen med de 12 operative Parquet-filene. Rapporten henter og beregner selv det den trenger.</p>
 
     <button type="button" on:click={chooseFolder} disabled={loading}>
       {loading ? 'Leser mappen…' : 'Velg datamappe'}
@@ -69,7 +69,7 @@
     </div>
 
     <details>
-      <summary>Filer som må finnes i mappen</summary>
+      <summary>De 12 filene som må finnes i mappen</summary>
       <ul>{#each requiredFiles as name}<li>{name}</li>{/each}</ul>
     </details>
   </section>

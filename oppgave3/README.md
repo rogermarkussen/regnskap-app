@@ -61,9 +61,10 @@ npm run build:task3
 ```
 
 Appen bruker port 3002. `npm run build` lager et internt bygg med dagens data.
-`npm run build:public` lager bare HTML, CSS og JavaScript; brukeren må deretter
-velge `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3/web` lokalt. Excel-
-leveransene følger ikke det offentlige bygget. Se [`../DATA.md`](../DATA.md).
+`npm run build:public` lager bare HTML, CSS, JavaScript og DuckDB-Wasm. Brukeren
+velger den samme lokale mappen med 12 operative Parquet-filer som i oppgave 1
+og oppgave 2. Månedsavslutning og workflowkontroll beregnes lokalt i nettleseren.
+Excel-leveransene følger ikke det offentlige bygget. Se [`../DATA.md`](../DATA.md).
 
 Detaljert Excel-sporbarhet finnes i
 [`README-EXCEL-SPORBARHET.md`](README-EXCEL-SPORBARHET.md).

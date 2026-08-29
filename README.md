@@ -17,13 +17,13 @@ og miljøvariabelen `REGNSKAP_DATA_ROOT`. Standard datarot er søskenmappen
 
 Les [`DATA.md`](DATA.md) før du oppdaterer data eller publiserer et bygg.
 
-Den komplette, lokale Parquet-mappa under `data/` kan testast slik:
+Den komplette, lokale Parquet-mappen under `data/` kan testes slik:
 
 ```bash
 npm run test:data-folder
 ```
 
-Når kommandoen er ferdig, kan `data/` veljast direkte i alle tre appane.
+Når kommandoen er ferdig, kan `data/` velges direkte i alle tre appene.
 
 ## Kom i gang
 
@@ -55,11 +55,8 @@ npm run build:public
 ```
 
 Kommandoen bygger tre rene klientapper uten Parquet, Excel, JSON-eksporter eller
-andre rapportdata. Etter åpning velger brukeren en lokal oppgavemappe:
-
-- oppgave 1: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave1/evidence`;
-- oppgave 2: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave2/static-app`;
-- oppgave 3: `$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave3/web`.
+andre rapportdata. I alle tre apper velger brukeren den samme lokale mappen med
+de 12 operative Parquet-filene. Rapportgrunnlaget beregnes lokalt i nettleseren.
 
 `.github/workflows/pages.yml` bygger og publiserer alle tre under
 `/oppgave1/`, `/oppgave2/` og `/oppgave3/` når `main` oppdateres på GitHub.

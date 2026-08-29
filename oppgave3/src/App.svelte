@@ -1,21 +1,15 @@
 <script>
-  import { parquetReadObjects } from 'hyparquet';
-  import { compressors } from 'hyparquet-compressors';
   import AppHeader from '../components/AppHeader.svelte';
   import MonthlyCloseReport from '../components/MonthlyCloseReport.svelte';
   import WorkflowInvoiceReport from '../components/WorkflowInvoiceReport.svelte';
   import LocalDataGate from '../../shared/browser/LocalDataGate.svelte';
-  import { requireLocalFiles } from '../../shared/browser/localDataFolder.js';
+  import {
+    COMMON_DATA_FILES,
+    requireCommonDataFiles
+  } from '../../shared/browser/localDataFolder.js';
+  import { loadTask3Data } from './buildTask3Data.js';
 
-  const requiredLocalFiles = [
-    'workflow_source_metadata.parquet',
-    'monthly_close_summary.parquet',
-    'monthly_close_invoices.parquet',
-    'monthly_close_validation.parquet',
-    'workflow_invoice_status.parquet',
-    'workflow_invoice_validation.parquet',
-    'workflow_invoice_events.parquet'
-  ];
+  const requiredLocalFiles = COMMON_DATA_FILES;
 
   let view = 'close';
   let dataReady = false;
@@ -32,25 +26,19 @@
   let selectedPeriod = '';
   let workflowRows = null;
   let workflowEvents = null;
-  let localFiles = null;
+  let task3Data = null;
   const isPublicBuild = __PUBLIC_BUILD__;
-
-  const readParquet = async (file) => parquetReadObjects({
-    file: await file.arrayBuffer(),
-    compressors
-  });
 
   const loadLocalData = async (selection) => {
     baseLoading = true;
     error = '';
     try {
-      localFiles = requireLocalFiles(selection, requiredLocalFiles);
-      [metadata, monthlySummary, monthlyInvoices, monthlyValidations] = await Promise.all([
-        readParquet(localFiles['workflow_source_metadata.parquet']),
-        readParquet(localFiles['monthly_close_summary.parquet']),
-        readParquet(localFiles['monthly_close_invoices.parquet']),
-        readParquet(localFiles['monthly_close_validation.parquet'])
-      ]);
+      const files = requireCommonDataFiles(selection);
+      task3Data = await loadTask3Data(files);
+      metadata = task3Data.metadata;
+      monthlySummary = task3Data.summary;
+      monthlyInvoices = task3Data.invoices;
+      monthlyValidations = task3Data.validations;
       const availablePeriods = [...new Set(monthlySummary.map((row) => String(row.periode)))].sort();
       const availableYears = [...new Set(availablePeriods.map((period) => period.slice(0, 4)))].sort();
       selectedYear = availableYears.includes('2026') ? '2026' : availableYears.at(-1) ?? '';
@@ -75,7 +63,7 @@
     if (nextView !== 'workflow' || workflowRows) return;
     workflowLoading = true;
     try {
-      workflowRows = await readParquet(localFiles['workflow_invoice_status.parquet']);
+      workflowRows = await task3Data.loadWorkflow();
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     } finally {
@@ -85,7 +73,7 @@
 
   async function loadWorkflowEvents(row) {
     if (!workflowEvents) {
-      workflowEvents = await readParquet(localFiles['workflow_invoice_events.parquet']);
+      workflowEvents = await task3Data.loadEvents();
     }
     return workflowEvents;
   }
@@ -148,7 +136,7 @@
         <span class="state-mark">!</span>
         <div>
           <h1>Dataene kunne ikke lastes</h1>
-          <p>{error}. Last siden på nytt og velg den oppgavespesifikke datamappen på nytt.</p>
+          <p>{error}. Last siden på nytt og velg den felles mappen med de 12 råfilene.</p>
         </div>
       </section>
     {:else if view === 'close'}

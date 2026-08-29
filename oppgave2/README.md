@@ -19,12 +19,11 @@ Viktige filer:
 - `kode/src/lib/reportModel.js`: utvalg, søk og kontogruppehierarki
 - `kode/src/lib/task2ExcelExport.js`: Excel-eksport
 
-Appen leser `task2-report.parquet` direkte fra mappen brukeren velger i
-nettleseren. Filen ligger under
-`$REGNSKAP_DATA_ROOT/generated/<snapshot-id>/oppgave2/static-app`, inneholder
-avledede rapportlinjer og følger ikke med webbygget. Kontantkilden kan ikke
-fordeles på seksjon. Kontantfelt vises derfor som manglende når en seksjon er
-valgt.
+Den offentlige appen leser de operative Parquet-filene direkte fra den samme
+lokale mappen som oppgave 1 og oppgave 3. Kontoplan, perioder, seksjoner,
+finansieringer og rapportlinjer bygges lokalt i nettleseren. Ingen avledet
+`task2-report.parquet` er nødvendig for GitHub Pages. Kontantbudsjett mangler
+fortsatt som operativ kilde, så tilhørende budsjett- og avviksfelt holdes tomme.
 
 Kjør fra repositoryroten:
 

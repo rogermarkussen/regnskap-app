@@ -1,6 +1,4 @@
 <script>
-  import { parquetReadObjects } from 'hyparquet';
-  import { compressors } from 'hyparquet-compressors';
   import writeExcelFile from 'write-excel-file/browser';
   import {
     budgetMonthValue,
@@ -14,9 +12,13 @@
     task2WorkbookFilename
   } from './lib/task2ExcelExport.js';
   import LocalDataGate from '../../../shared/browser/LocalDataGate.svelte';
-  import { requireLocalFiles } from '../../../shared/browser/localDataFolder.js';
+  import {
+    COMMON_DATA_FILES,
+    requireCommonDataFiles
+  } from '../../../shared/browser/localDataFolder.js';
+  import { buildTask2Report } from './lib/buildTask2Report.js';
 
-  const requiredLocalFiles = ['task2-report.parquet'];
+  const requiredLocalFiles = COMMON_DATA_FILES;
 
   const reportOptions = [
     { value: '154301', label: '154301' },
@@ -165,11 +167,8 @@
     loading = true;
     loadError = '';
     try {
-      const files = requireLocalFiles(selection, requiredLocalFiles);
-      const loadedRows = await parquetReadObjects({
-        file: await files['task2-report.parquet'].arrayBuffer(),
-        compressors
-      });
+      const files = requireCommonDataFiles(selection);
+      const loadedRows = await buildTask2Report(files);
       const columns = new Set(Object.keys(loadedRows[0] ?? {}));
       if (!['section_code', 'finansiering', 'rapportperiode', 'row_type'].every((name) => columns.has(name))) {
         throw new Error('Datakilden har et ukjent format');
@@ -304,7 +303,7 @@
   <main class="state-shell error-state" role="alert">
     <span class="state-code">Datakilde</span>
     <h1>Rapporten kan ikke åpnes</h1>
-    <p>{loadError}. Bygg rapportdata på nytt og last siden igjen.</p>
+      <p>{loadError}. Kontroller at du har valgt den felles mappen med de 12 råfilene.</p>
   </main>
 {:else}
   <main class="report-shell">
