@@ -107,6 +107,11 @@ Databygg skriver til:
 $REGNSKAP_DATA_ROOT/generated/<snapshot-id>/<oppgave>/
 ```
 
+Manifestet kan angi en nyere, oppgavespesifikk ID under
+`generated_snapshot_ids` eller `test_generated_snapshot_ids`. Dette brukes når
+én oppgave må bygges på nytt uten å overskrive eller flytte leveransene til de
+andre oppgavene.
+
 Hver app lager et regenererbart statisk `build/`. Oppgave 1 lager i tillegg en
 lokal DuckDB for Evidence. Oppgave 2 bygger én avledet, ZSTD-komprimert
 Parquet-fil som den statiske appen leser i nettleseren.

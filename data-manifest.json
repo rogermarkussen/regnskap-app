@@ -3,6 +3,9 @@
   "snapshot_id": "2026-08-23",
   "data_root_env": "REGNSKAP_DATA_ROOT",
   "test_snapshot_id": "2026-08-29-february-repaired",
+  "test_generated_snapshot_ids": {
+    "oppgave3": "2026-08-29-task3-sections-fixed"
+  },
   "test_data_root_env": "REGNSKAP_TEST_DATA_ROOT",
   "datasets": {
     "common.ledger": {

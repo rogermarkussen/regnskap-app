@@ -57,6 +57,27 @@ class DataContract:
             if self.test_data_root
             else snapshot_id
         )
+        generated_snapshot_ids = (
+            manifest.get("test_generated_snapshot_ids", {})
+            if self.test_data_root
+            else manifest.get("generated_snapshot_ids", {})
+        )
+        if not isinstance(generated_snapshot_ids, dict):
+            raise DataContractError("Oppgavespesifikke snapshot-ID-er må være et objekt")
+        self._generated_snapshot_ids = {}
+        for task_name, generated_snapshot_id in generated_snapshot_ids.items():
+            task = str(task_name)
+            value = str(generated_snapshot_id)
+            if (
+                not task
+                or any(part in task for part in ("/", "\\", ".."))
+                or not value
+                or any(part in value for part in ("/", "\\", ".."))
+            ):
+                raise DataContractError(
+                    f"Ugyldig oppgavespesifikk snapshot-ID: {task_name}={generated_snapshot_id}"
+                )
+            self._generated_snapshot_ids[task] = value
         datasets = manifest.get("datasets")
         if not isinstance(datasets, dict) or not datasets:
             raise DataContractError("Datamanifestet må inneholde minst ett datasett")
@@ -123,7 +144,8 @@ class DataContract:
         if not task_name or any(part in task_name for part in ("/", "\\", "..")):
             raise DataContractError(f"Ugyldig oppgavenavn: {task_name}")
         output_root = self.test_data_root or self.data_root
-        return output_root / "generated" / self.snapshot_id / task_name
+        snapshot_id = self._generated_snapshot_ids.get(task_name, self.snapshot_id)
+        return output_root / "generated" / snapshot_id / task_name
 
 
 def load_data_contract(repo_root: Path | None = None) -> DataContract:

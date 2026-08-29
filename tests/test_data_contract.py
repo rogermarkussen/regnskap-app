@@ -75,6 +75,7 @@ class DataContractTest(unittest.TestCase):
             "schema_version": 1,
             "snapshot_id": "production",
             "test_snapshot_id": "test-snapshot",
+            "test_generated_snapshot_ids": {"oppgave3": "task3-v2"},
             "test_data_root_env": "REGNSKAP_TEST_DATA_ROOT",
             "datasets": {
                 "ledger": {
@@ -122,4 +123,8 @@ class DataContractTest(unittest.TestCase):
         self.assertEqual(
             contract.generated_dir("oppgave2"),
             test_root / "generated" / "test-snapshot" / "oppgave2",
+        )
+        self.assertEqual(
+            contract.generated_dir("oppgave3"),
+            test_root / "generated" / "task3-v2" / "oppgave3",
         )
