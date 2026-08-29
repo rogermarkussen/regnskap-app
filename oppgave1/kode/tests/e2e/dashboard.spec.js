@@ -9,7 +9,6 @@ const metricCard = (panel, title) => panel.locator(`[data-metric-title="${title}
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Økonomisk status' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Kostnadssted' })).toContainText('Alle kostnadssteder');
 });
 
 test('viser eit avgrensa finansdashbord utan import eller eksport', async ({ page }) => {
@@ -20,6 +19,12 @@ test('viser eit avgrensa finansdashbord utan import eller eksport', async ({ pag
   await expect(page.getByRole('button', { name: /last opp/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /last ned/i })).toHaveCount(0);
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(page.locator('.eyebrow')).toHaveText('Finansiell styring');
+  await expect(page.locator('.hero-context')).toHaveText('Alle kostnadssteder');
+  await expect(page.locator('.hero-context')).not.toContainText(/20\d{2}/);
+  await expect(page.getByRole('combobox', { name: 'Kostnadssted' })).toHaveCount(0);
+  await expect(page.locator('.metric-value-row').getByText('NOK 1 000', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.panel-count')).toHaveCount(0);
 });
 
 test('viser enkel kjeldestatus utan teknisk støy', async ({ page }) => {
@@ -36,33 +41,25 @@ test('rapportperioden bruker siste data som standard og oppdaterer KPI-ene', asy
 
   await expect(page.getByRole('combobox', { name: 'Rapportperiode' }))
     .toContainText('Siste tilgjengelige · juli 2026');
-  await expect(page.locator('.hero-context')).toContainText('Juli 2026');
   const julyValue = await adkValue.textContent();
 
   await page.getByRole('combobox', { name: 'Rapportperiode' }).click();
   await page.getByText('April 2026', { exact: true }).click();
-  await expect(page.locator('.hero-context')).toContainText('April 2026');
+  await expect(page.getByRole('combobox', { name: 'Rapportperiode' })).toContainText('April 2026');
+  await expect(adkValue).not.toHaveText(julyValue ?? '');
   const aprilValue = await adkValue.textContent();
 
   await page.getByRole('combobox', { name: 'Rapportperiode' }).click();
   await page.getByText('Juni 2026', { exact: true }).click();
-  await expect(page.locator('.hero-context')).toContainText('Juni 2026');
+  await expect(page.getByRole('combobox', { name: 'Rapportperiode' })).toContainText('Juni 2026');
+  await expect(adkValue).not.toHaveText(aprilValue ?? '');
   const juneValue = await adkValue.textContent();
 
   expect(new Set([aprilValue, juneValue, julyValue]).size).toBe(3);
 });
 
-test('kostnadsstedsfilteret bruker dimensjon C1 og endrer tallene', async ({ page }) => {
-  const panel = financingPanel(page, 'Driftsutgifter');
-  const adkValue = metricCard(panel, 'ADK').locator('.big-number');
-  const allSectionsValue = await adkValue.textContent();
-
-  await page.getByRole('combobox', { name: 'Kostnadssted' }).click();
-  await page.getByPlaceholder('Kostnadssted').fill('251');
-  await page.getByText('251 · ØS - Økonomi og styring', { exact: true }).click();
-
-  await expect(page.locator('.hero-context')).toContainText('251 · ØS - Økonomi og styring');
-  await expect(adkValue).not.toHaveText(allSectionsValue ?? '');
+test('viser alltid tall for alle kostnadssteder', async ({ page }) => {
+  await expect(page.getByRole('combobox', { name: 'Kostnadssted' })).toHaveCount(0);
   await expect(page.locator('.metric-card')).toHaveCount(9);
 });
 
@@ -84,7 +81,7 @@ test('beheld leserekkefølgja på mobil', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const headings = await page.locator('.panel-heading h2').allTextContents();
   expect(headings).toEqual(['Driftsutgifter', 'Utstyr og vedlikehold', 'Nytt nødnett']);
-  await expect(page.getByRole('combobox', { name: 'Kostnadssted' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Kostnadssted' })).toHaveCount(0);
   const periodPicker = page.getByRole('combobox', { name: 'Rapportperiode' });
   await expect(periodPicker).toBeVisible();
   expect(await periodPicker.evaluate((element) => getComputedStyle(element).overflowX)).toBe('hidden');

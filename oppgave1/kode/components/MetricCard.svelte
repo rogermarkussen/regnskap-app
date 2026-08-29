@@ -59,7 +59,6 @@
   {:else}
     <div class="metric-value-row">
       <strong class="big-number">{actualValue}</strong>
-      <span>NOK 1 000</span>
     </div>
 
     {#if hasBudget}
@@ -170,13 +169,6 @@
     letter-spacing: -0.045em;
     line-height: 0.95;
     text-overflow: ellipsis;
-  }
-
-  .metric-value-row > span {
-    color: #6d8294;
-    font-size: 9px;
-    font-weight: 700;
-    white-space: nowrap;
   }
 
   .comparison {

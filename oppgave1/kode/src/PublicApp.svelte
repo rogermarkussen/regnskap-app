@@ -6,7 +6,6 @@
   let dataReady = false;
   let rows = [];
   let sourceMetadata = [];
-  let sectionCode = 'all';
   let yearKey = '';
   let periodKey = 'latest';
 
@@ -23,17 +22,11 @@
     const loaded = await loadTask1Data(selection);
     rows = loaded.rows;
     sourceMetadata = loaded.metadata;
-    sectionCode = 'all';
     yearKey = String(availableYears(loaded.rows).at(-1) ?? '');
     periodKey = 'latest';
     dataReady = true;
   };
 
-  $: sections = [...new Map(rows.map((row) => [String(row.section_code), {
-    value: String(row.section_code),
-    label: String(row.section_label),
-    sort: Number(row.section_sort ?? 0)
-  }])).values()].sort((left, right) => left.sort - right.sort);
   $: years = availableYears(rows);
   $: effectiveYear = Number(yearKey);
   $: periods = [...new Map(rows
@@ -45,7 +38,7 @@
   }])).values()].sort((left, right) => right.sort - left.sort);
   $: effectivePeriod = periodKey === 'latest' ? periods[0]?.value : periodKey;
   $: currentRows = rows.filter((row) =>
-    String(row.section_code) === sectionCode && String(row.end_period) === effectivePeriod
+    String(row.section_code) === 'all' && String(row.end_period) === effectivePeriod
   );
   $: fin154301 = currentRows.filter((row) => row.finansiering === '154301');
   $: fin154345 = currentRows.filter((row) => row.finansiering === '154345');
@@ -66,12 +59,6 @@
     {sourceMetadata}
   >
     <div slot="filters" class="evidence-filter-grid public-filter-grid">
-      <label class="public-picker cost-center-picker">
-        <span>Kostnadssted</span>
-        <select role="combobox" aria-label="Kostnadssted" bind:value={sectionCode}>
-          {#each sections as section}<option value={section.value}>{section.label}</option>{/each}
-        </select>
-      </label>
       <label class="public-picker period-picker">
         <span>Til og med</span>
         <select role="combobox" aria-label="Rapportperiode" bind:value={periodKey}>

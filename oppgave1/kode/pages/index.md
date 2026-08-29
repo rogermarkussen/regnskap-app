@@ -3,19 +3,10 @@ title: KPI-dashboard
 sidebar_position: 1
 ---
 
-```sql section_options
-select distinct
-  section_code,
-  section_label,
-  section_sort
-from dashboard_kpi_calculated
-order by section_sort, section_label
-```
-
 ```sql current_kpis
 select *
 from dashboard_kpi_calculated
-where section_code = '${inputs.section_filter.value}'
+where section_code = 'all'
   and end_period = case
     when '${inputs.period_filter.value}' = 'latest'
       then (select max(end_period) from dashboard_kpi_calculated)
@@ -69,18 +60,6 @@ select * from dashboard_kpi_source_metadata
   sourceMetadata={kpi_kildemetadata}
 >
   <div slot="filters" class="evidence-filter-grid">
-    <div class="cost-center-picker">
-      <Dropdown
-        data={section_options}
-        name=section_filter
-        value=section_code
-        label=section_label
-        order=section_sort
-        title="Kostnadssted"
-        description="Velg kostnadssted fra dimensjon C1 i regnskapet"
-        defaultValue="all"
-      />
-    </div>
     <div class="period-picker">
       <Dropdown
         data={period_options}
