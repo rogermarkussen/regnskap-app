@@ -92,11 +92,11 @@ class Task2GroupingFasitTest(unittest.TestCase):
                 )
                 for column in self.comparison_columns:
                     comparable = comparison
-                    if self.new_schema and column == "avvik_tusen":
+                    if column == "avvik_tusen":
                         comparable = comparison[
                             comparison["virksomhet_budsjett_tusen_beregnet"].notna()
                         ]
-                    elif self.new_schema and column == "forbruk_av_aarets_budsjett":
+                    elif column == "forbruk_av_aarets_budsjett":
                         comparable = comparison[
                             comparison["aarets_budsjett_tusen_beregnet"].notna()
                         ]
@@ -110,15 +110,15 @@ class Task2GroupingFasitTest(unittest.TestCase):
                     )
 
                 expected_total = expected[expected["radtekst"] == "Driftskostnader"].iloc[0]
+                total_accounts = calculated_accounts[
+                    calculated_accounts["konto"].isin(expected_accounts["konto"])
+                    & calculated_accounts["konto"].astype(int).between(5000, 7834)
+                ]
+                total_comparison_incomplete = (
+                    (total_accounts["hovedbok_tusen"].fillna(0).abs() > TOLERANCE)
+                    & total_accounts["virksomhet_budsjett_tusen"].isna()
+                ).any()
                 if self.new_schema:
-                    total_accounts = calculated_accounts[
-                        calculated_accounts["konto"].isin(expected_accounts["konto"])
-                        & calculated_accounts["konto"].astype(int).between(5000, 7834)
-                    ]
-                    total_comparison_incomplete = (
-                        (total_accounts["hovedbok_tusen"].fillna(0).abs() > TOLERANCE)
-                        & total_accounts["virksomhet_budsjett_tusen"].isna()
-                    ).any()
                     calculated_values = {
                         column: float(total_accounts[column].fillna(0).sum())
                         for column in self.comparison_columns
@@ -140,8 +140,7 @@ class Task2GroupingFasitTest(unittest.TestCase):
                     }
                 for column in self.comparison_columns:
                     if (
-                        self.new_schema
-                        and total_comparison_incomplete
+                        total_comparison_incomplete
                         and column in {"avvik_tusen", "forbruk_av_aarets_budsjett"}
                     ):
                         continue

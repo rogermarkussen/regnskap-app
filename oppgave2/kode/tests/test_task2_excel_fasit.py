@@ -138,7 +138,7 @@ class Task2ReportPeriodTest(unittest.TestCase):
         self.assertGreater(checked, 0)
         self.assertEqual(errors, 0)
 
-    def test_investment_columns_follow_154345_rule(self) -> None:
+    def test_investment_report_uses_asset_accounts_from_ledger(self) -> None:
         rows_path = CONTRACT.generated_dir("oppgave2") / "static-app" / "grouped_finance_rows.parquet"
         connection = duckdb.connect()
         try:
@@ -148,52 +148,75 @@ class Task2ReportPeriodTest(unittest.TestCase):
                     f"describe select * from read_parquet('{rows_path.as_posix()}')"
                 ).fetchall()
             }
-            if "report_year" in columns:
-                totals_filter = "row_type = 'account'"
-                join_keys = """
-                  and investment.section_code = report.section_code
-                  and investment.period_to = report.period_to
-                  and investment.konto = report.konto
-                """
-            else:
-                totals_filter = "radtekst = 'Driftskostnader'"
-                join_keys = ""
-            mismatches = connection.execute(
+            self.assertNotIn("investeringsbudsjett_tusen", columns)
+            self.assertNotIn("investeringsregnskap_tusen", columns)
+            period_filter = (
+                "period_to = 202603"
+                if "report_year" in columns
+                else "rapportperiode = 'p1_3'"
+            )
+
+            comparison = connection.execute(
                 f"""
-                with totals as (
-                  select *
+                with source as (
+                  select lpad(trim(account), 4, '0') as konto,
+                    sum(try_cast(amount as double)) / 1000.0 as hovedbok_tusen
+                  from read_parquet('{LEDGER_PATH.as_posix()}')
+                  where lpad(trim(account), 4, '0') in ('1250', '1270', '1280', '1281')
+                    and try_cast(period as integer) between 202601 and 202603
+                  group by 1
+                ), report as (
+                  select konto, hovedbok_tusen, virksomhet_budsjett_tusen,
+                    aarets_budsjett_tusen, avvik_tusen
                   from read_parquet('{rows_path.as_posix()}')
-                  where {totals_filter}
+                  where section_code = 'all'
+                    and finansiering = 'alle'
+                    and {period_filter}
+                    and hovedgruppe = 'Investeringsrapport'
+                    and row_type = 'account'
                 )
-                select count(*)
-                from totals report
-                join totals investment
-                  on investment.finansiering = '154345'
-                 and investment.rapportperiode = report.rapportperiode
-                 {join_keys}
-                where report.finansiering in ('154345', 'alle')
-                  and (
-                    abs(report.investeringsbudsjett_tusen - investment.virksomhet_budsjett_tusen) > 0.00001
-                    or abs(report.investeringsregnskap_tusen - investment.hovedbok_tusen) > 0.00001
-                  )
+                select count(*) as checked,
+                  count(*) filter (where abs(source.hovedbok_tusen - report.hovedbok_tusen) > 0.00001) as mismatches,
+                  count(*) filter (where report.virksomhet_budsjett_tusen is not null
+                    or report.aarets_budsjett_tusen is not null
+                    or report.avvik_tusen is not null) as invented_budget_values,
+                  sum(report.hovedbok_tusen) as report_total
+                from source join report using (konto)
                 """
-            ).fetchone()[0]
-            non_investment_values = connection.execute(
+            ).fetchone()
+            total_row = connection.execute(
                 f"""
-                select count(*)
+                select hovedbok_tusen
                 from read_parquet('{rows_path.as_posix()}')
-                where finansiering in ('154301', '154322+045101')
-                  and (
-                    investeringsbudsjett_tusen is not null
-                    or investeringsregnskap_tusen is not null
-                  )
+                where section_code = 'all'
+                  and finansiering = 'alle'
+                  and {period_filter}
+                  and hovedgruppe = 'Investeringsrapport'
+                  and row_type = 'total'
+                  and radtekst = 'Totale investeringer'
                 """
-            ).fetchone()[0]
+            ).fetchone()
+            section_row = connection.execute(
+                f"""
+                select excel_row
+                from read_parquet('{rows_path.as_posix()}')
+                where section_code = 'all'
+                  and finansiering = 'alle'
+                  and {period_filter}
+                  and hovedgruppe = 'Investeringsrapport'
+                  and row_type = 'section'
+                """
+            ).fetchone()
         finally:
             connection.close()
 
-        self.assertEqual(mismatches, 0)
-        self.assertEqual(non_investment_values, 0)
+        self.assertEqual(comparison[0], 4)
+        self.assertEqual(comparison[1], 0)
+        self.assertEqual(comparison[2], 0)
+        self.assertAlmostEqual(comparison[3], 2108.61732, places=5)
+        self.assertIsNotNone(total_row)
+        self.assertAlmostEqual(total_row[0], 2108.61732, places=5)
+        self.assertEqual(section_row, (1,))
 
     def test_missing_budget_source_is_not_published_as_zero(self) -> None:
         rows_path = (

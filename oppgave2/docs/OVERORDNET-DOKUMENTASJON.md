@@ -66,9 +66,10 @@ Kontoenes plassering i hovedgrupper og kontogrupper kommer fra:
 data-fra-økonomi/Kontogruppering 17.06.26.xlsx
 ```
 
-Grupperingsfilen definerer 3 hovedgrupper, 16 kontogrupper og 114 unike
-kontoer. Konto 5405 forekommer flere ganger i kildefilen og dedupliseres for
-å unngå dobbel summering.
+Løsningen viser fire hovedgrupper og 118 unike kontoer når
+investeringsrapportens fire kontoer tas med. Investeringsrapporten står først.
+Konto 5405 forekommer flere ganger i grupperingsfilen og dedupliseres for å
+unngå dobbel summering.
 
 ### Kontantregnskap
 
@@ -127,40 +128,37 @@ Et negativt avvik betyr at hovedbok er høyere enn budsjett.
 
 ### Månedsbudsjett
 
-Månedsvisningen viser alle tolv budsjettmånedene. Kolonnen «Totalt alle
-måneder» er summen av januar–desember og tilsvarer årsbudsjettet.
+Månedsvisningen viser alle tolv budsjettmånedene. Årstotalen vises ikke en
+gang til etter desember, siden den allerede står i kolonnen «Årsbudsjett».
 
 ### Kontantregnskap
 
-- Kontantbudsjett.
-- Kontantregnskap.
-- Kontantavvik = kontantbudsjett minus kontantregnskap.
+Webvisningen og Excel-eksporten viser én kolonne med kontantregnskap. Det
+operative grunnlaget har ikke et kontantbudsjett som kan brukes til å vise et
+meningsfullt avvik.
 
 Manglende kontantgrunnlag vises som `–` og erstattes ikke med konstruerte
 nullverdier.
 
-## Investering og finansiering 154345
+## Investeringsrapport
 
-Følgende arbeidsregel er godkjent for løsningen:
+Investering vises som en egen hovedgruppe, ikke som to egne tallkolonner.
+Hovedgruppen «Investeringsrapport» inneholder undergruppen «Varige
+driftsmidler» og kontoene 1250, 1270, 1280 og 1281. Hovedbokstallene hentes
+fra `agltransact.parquet` med de samme periode-, finansierings- og
+seksjonsfiltrene som resten av rapporten.
 
-- investeringsbudsjett = budsjett `2026B` med `dim_1 = 212`;
-- investeringsregnskap = hovedbok med `dim_4 = 154345`.
+For januar–mars 2026 og alle finansieringer summerer disse fire kontoene til
+2 108,61732 tusen kroner. Det operative budsjettgrunnlaget har ingen
+budsjettposter for kontoene. Budsjett, avvik og forbruk vises derfor som tomme
+verdier, ikke som konstruerte nuller.
 
-Kolonnene vises for `154345` og «Alle finansieringer». De er tomme for de
-andre finansieringsvalgene.
-
-For januar–juni 2026 gir regelen:
-
-- investeringsbudsjett: 14 440 tusen kroner;
-- investeringsregnskap: 7 028 tusen kroner.
-
-I den operative hovedboken har `154345` kostnadstall på konto 6710 og 6730.
-Begge kontoene ligger i kontogruppen «Konsulentkostnader». Budsjettet ligger
-bare på konto 6710. Det finnes også en postering på inntektskonto 3900, men
-den inngår ikke i rapportens driftskostnader.
+Investeringsrapporten har egen total «Totale investeringer» og inngår ikke i
+totalen «Driftskostnader».
 
 Hele kontostrukturen vises i rapporten, også når kontoene har null. Derfor
-viser «Åpne alle grupper» alle 114 kontoer, selv om bare to kostnadskontoer har
+viser «Åpne alle grupper» alle 118 kontoer, inkludert de fire
+investeringskontoene, selv om bare to kostnadskontoer har
 regnskapstall for `154345`.
 
 ## Automatiske kontroller
@@ -174,9 +172,9 @@ kontrollerer blant annet:
 - at månedsbudsjettet summerer til årsbudsjettet;
 - at januar–juni er summen av måned 1–6;
 - at kontantavvik bare beregnes når kontantgrunnlaget finnes;
-- at investeringskolonnene følger `154345`-regelen;
+- at investeringsrapporten avstemmer konto 1250, 1270, 1280 og 1281 mot hovedboken;
 - at beregnede hovedbok- og budsjettverdier stemmer mot Excel-fasiten.
-- at alle seksjoner har 16 finansierings-/periodevalg og alle 114 kontoer;
+- at alle seksjoner har 16 finansierings-/periodevalg og alle 118 kontoer;
 - at seksjonssummene avstemmer mot totalsynet;
 - at kontantverdier ikke konstrueres for seksjoner når kilden mangler fordeling.
 
@@ -224,13 +222,10 @@ npm run refresh
 
 ### 1. Endelig definisjon av investering
 
-Økonomi bør bekrefte at `dim_1 = 212` og `dim_4 = 154345` representerer hele
-investeringsområdet. Dagens kilder gir bare kostnadstall på konto 6710 og
-6730. Det må avklares om investeringer også bokføres på balansekontoer, andre
-finansieringer eller andre dimensjonsverdier.
-
-Inntil dette er endelig bekreftet, kan kolonnenavnene «Budsjett 154345» og
-«Regnskap 154345» være mer presise enn generelle investeringsbegreper.
+Økonomi bør bekrefte at konto 1250, 1270, 1280 og 1281 er den fullstendige
+avgrensningen for investeringsrapporten. Løsningen følger disse kontoene på
+tvers av rapportens finansierings-, periode- og seksjonsvalg. Eventuelle nye
+investeringskontoer må legges til som en eksplisitt faglig regel.
 
 ### 2. Operativ Parquet-kilde for kontantregnskap
 
@@ -258,11 +253,11 @@ gir mange nullrader for finansieringer med få posteringer. Det bør avklares om
 standardvisningen heller skal vise aktive kontoer og tilby en bryter «Vis
 nullkontoer».
 
-### 6. Inntektskonto 3900 for finansiering 154345
+### 6. Avgrensning av investeringskontoer
 
-Hovedboken inneholder en postering på konto 3900 for `154345`. Kontoen er en
-inntektskonto og inngår ikke i driftskostnadstotalen. Økonomi bør bekrefte at
-den også skal holdes utenfor investeringsregnskapet.
+Investeringsrapporten er avgrenset til konto 1250, 1270, 1280 og 1281, slik
+de fremgår av referanserapporten. Andre balanse- og inntektskontoer inngår
+ikke uten en egen faglig regel.
 
 ## Anbefalt faglig godkjenning før levering
 
@@ -271,8 +266,8 @@ En økonomibruker bør kontrollere:
 1. totalsummene for alle finansieringsvalg;
 2. fortegnet på avvik;
 3. plasseringen av kontoene i kontogruppene;
-4. investeringsregelen for `154345`;
-5. behandlingen av konto 3900;
+4. avgrensningen til investeringskonto 1250, 1270, 1280 og 1281;
+5. at investeringsrapporten holdes utenfor driftskostnadstotalen;
 6. kontantregnskapets kilde og periode;
 7. regelen for nyeste komplette måned;
 8. Excel-eksportens kolonner, enhet og desimaler.

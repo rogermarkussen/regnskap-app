@@ -66,7 +66,7 @@ Råtransaksjoner og fasit følger ikke med.
 Produksjonskontrollen krever:
 
 - alle 16 finansierings-/periodevalg i totalsynet og for hver seksjon;
-- alle 114 definerte kontoer i hvert rapportvalg;
+- alle 118 definerte kontoer i hvert rapportvalg;
 - én driftskostnadstotal per valg;
 - `budsjett − hovedbok = avvik`;
 - tolv månedsbudsjetter som summerer til årsbudsjettet;

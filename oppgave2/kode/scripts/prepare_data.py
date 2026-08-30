@@ -11,10 +11,10 @@ from openpyxl import load_workbook
 
 try:
     from .project_data import task2_sources
-    from .parquet_report import ParquetReportSources, build_parquet_report
+    from .parquet_report import INVESTMENT_ACCOUNTS, ParquetReportSources, build_parquet_report
 except ImportError:
     from project_data import task2_sources
-    from parquet_report import ParquetReportSources, build_parquet_report
+    from parquet_report import INVESTMENT_ACCOUNTS, ParquetReportSources, build_parquet_report
 
 
 CODE_ROOT = Path(__file__).resolve().parents[1]
@@ -152,30 +152,18 @@ def finance_rows_frame(workbook_path: Path = SOURCE_DASHBOARD_WORKBOOK) -> pd.Da
 
 
 def account_groups(conn: duckdb.DuckDBPyConnection) -> Path:
-    worksheet = load_workbook(GROUPING_WORKBOOK, read_only=True, data_only=True)["Kontogruppering"]
-    rows = []
-    current_main_group: str | None = None
-    for excel_row, row in enumerate(worksheet.iter_rows(min_row=3, values_only=True), start=3):
-        values = [clean_cell(value) for value in row]
-        if len(values) > 1 and values[1]:
-            current_main_group = str(values[1])
-        subgroup = values[2] if len(values) > 2 else None
-        if not current_main_group or not subgroup:
-            continue
-        for cell in values[3:]:
-            if not cell:
-                continue
-            account_number, account_name = account_parts(cell)
-            rows.append(
-                {
-                    "hovedgruppe": current_main_group,
-                    "undergruppe": str(subgroup),
-                    "konto_text": str(cell),
-                    "konto": account_number,
-                    "konto_navn": account_name,
-                    "excel_row": excel_row,
-                }
-            )
+    rows = [
+        {
+            "hovedgruppe": group["hovedgruppe"],
+            "undergruppe": group["undergruppe"],
+            "konto_text": account["konto_text"],
+            "konto": account["konto"],
+            "konto_navn": account["konto_navn"],
+            "excel_row": excel_row,
+        }
+        for excel_row, group in enumerate(grouping_structure(), start=1)
+        for account in group["accounts"]
+    ]
     return write_parquet(conn, "account_groups", pd.DataFrame(rows))
 
 
@@ -189,11 +177,7 @@ REPORT_VALUE_COLUMNS = [
     "kontant_tusen",
     "kontant_avvik_tusen",
 ]
-INVESTMENT_VALUE_COLUMNS = [
-    "investeringsbudsjett_tusen",
-    "investeringsregnskap_tusen",
-]
-SUMMED_VALUE_COLUMNS = [*REPORT_VALUE_COLUMNS, *INVESTMENT_VALUE_COLUMNS]
+SUMMED_VALUE_COLUMNS = REPORT_VALUE_COLUMNS
 
 def latest_complete_ledger_period(
     ledger_path: Path = LEDGER_PARQUET,
@@ -279,6 +263,39 @@ def grouping_structure() -> list[dict[str, object]]:
                 "accounts": accounts,
             }
         )
+
+    conn = duckdb.connect()
+    try:
+        investment_names = dict(
+            conn.execute(
+                f"""
+                select lpad(trim(dim_value), 4, '0') as konto,
+                  any_value(trim(description)) as konto_navn
+                from read_parquet('{DIMENSION_VALUES_PARQUET.as_posix()}')
+                where attribute_id = 'A0'
+                  and lpad(trim(dim_value), 4, '0') in ('1250', '1270', '1280', '1281')
+                group by 1
+                """
+            ).fetchall()
+        )
+    finally:
+        conn.close()
+    investment_accounts = [
+        {
+            "konto": account,
+            "konto_navn": investment_names.get(account, "Kontonavn mangler"),
+            "konto_text": f"{account} - {investment_names.get(account, 'Kontonavn mangler')}",
+        }
+        for account in INVESTMENT_ACCOUNTS
+    ]
+    groups.insert(
+        0,
+        {
+            "hovedgruppe": "Investeringsrapport",
+            "undergruppe": "Varige driftsmidler",
+            "accounts": investment_accounts,
+        },
+    )
     return groups
 
 
@@ -497,8 +514,6 @@ def calculated_account_values(section_code: str | None = None) -> dict[
             )
 
         for period_key, (period_to, _) in TASK2_PERIODS.items():
-            # Behold den tidligere avstemte Jan–Mar-beregningen for 154301 og
-            # alle. Andre perioder og finansieringer beregnes fra Parquet.
             if (
                 section_code is None
                 and period_key == "p1_3"
@@ -536,14 +551,16 @@ def calculated_account_values(section_code: str | None = None) -> dict[
                     f"budsjett_{period}_tusen": budget.get(account, {}).get(
                         f"periode_{period}_tusen"
                     )
-                    or 0.0
                     for period in range(202601, 202613)
                 }
-                period_budget = sum(
+                period_values = [
                     monthly[f"budsjett_{period}_tusen"]
                     for period in range(202601, period_to + 1)
-                )
-                annual_budget = sum(monthly.values())
+                    if monthly[f"budsjett_{period}_tusen"] is not None
+                ]
+                annual_values = [value for value in monthly.values() if value is not None]
+                period_budget = sum(period_values) if period_values else None
+                annual_budget = sum(annual_values) if annual_values else None
                 actual_value = actual.get(account, {}).get("hovedbok_tusen") or 0.0
                 cash_budget, cash_value = _cash_values_for_account(
                     cash,
@@ -553,7 +570,9 @@ def calculated_account_values(section_code: str | None = None) -> dict[
                 values_by_account[account] = {
                     "virksomhet_budsjett_tusen": period_budget,
                     "hovedbok_tusen": actual_value,
-                    "avvik_tusen": period_budget - actual_value,
+                    "avvik_tusen": (
+                        None if period_budget is None else period_budget - actual_value
+                    ),
                     "aarets_budsjett_tusen": annual_budget,
                     **monthly,
                     "kontant_budsjett_tusen": cash_budget,
@@ -573,10 +592,24 @@ def _summed_values(rows: list[dict[str, object]]) -> dict[str, float | None]:
     for column in SUMMED_VALUE_COLUMNS:
         present = [row.get(column) for row in rows if row.get(column) is not None]
         values[column] = sum(float(value) for value in present) if present else None
+    missing_period_budget = any(
+        row.get("virksomhet_budsjett_tusen") is None
+        and row.get("hovedbok_tusen") not in (None, 0, 0.0)
+        for row in rows
+    )
+    missing_annual_budget = any(
+        row.get("aarets_budsjett_tusen") is None
+        and row.get("hovedbok_tusen") not in (None, 0, 0.0)
+        for row in rows
+    )
+    if missing_period_budget:
+        values["avvik_tusen"] = None
     annual = values["aarets_budsjett_tusen"]
     actual = values["hovedbok_tusen"]
     values["forbruk_av_aarets_budsjett"] = (
-        None if annual in (None, 0) or actual is None else float(actual) / float(annual)
+        None
+        if missing_annual_budget or annual in (None, 0) or actual is None
+        else float(actual) / float(annual)
     )
     return values
 
@@ -671,8 +704,6 @@ def grouped_finance_rows_frame(
         for financing, label in report_options
         for period_key in TASK2_PERIODS
     ]:
-        include_investment = financing in {"154345", "alle"}
-        investment_accounts = account_values[("154345", period_key)]
         _, periodetekst = TASK2_PERIODS[period_key]
         source_files = (
             f"{LEDGER_PARQUET.name}; {BUDGET_HEADER_PARQUET.name}; "
@@ -730,20 +761,6 @@ def grouped_finance_rows_frame(
                         if has_operational_data
                         else _empty_account_values()
                     )
-                    investment_values = investment_accounts.get(account_number, {})
-                    values = {
-                        **values,
-                        "investeringsbudsjett_tusen": (
-                            float(investment_values.get("virksomhet_budsjett_tusen") or 0.0)
-                            if include_investment
-                            else None
-                        ),
-                        "investeringsregnskap_tusen": (
-                            float(investment_values.get("hovedbok_tusen") or 0.0)
-                            if include_investment
-                            else None
-                        ),
-                    }
                     if period_key != cash_periods[financing]:
                         values = {
                             **values,
@@ -811,7 +828,11 @@ def grouped_finance_rows_frame(
                     "excel_row": excel_row,
                     "hovedgruppe": main_group,
                     "row_type": "total",
-                    "radtekst": f"Totale {main_group.lower()}",
+                    "radtekst": (
+                        "Totale investeringer"
+                        if main_group == "Investeringsrapport"
+                        else f"Totale {main_group.lower()}"
+                    ),
                     "konto": None,
                     "konto_navn": None,
                     **_summed_values(main_group_accounts),
@@ -820,7 +841,12 @@ def grouped_finance_rows_frame(
             )
             excel_row += 1
 
-        all_accounts = [row for row in report_rows if row["row_type"] == "account"]
+        all_accounts = [
+            row
+            for row in report_rows
+            if row["row_type"] == "account"
+            and row["hovedgruppe"] != "Investeringsrapport"
+        ]
         report_rows.append(
             {
                 **scope_fields,

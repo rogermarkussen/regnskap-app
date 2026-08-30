@@ -21,11 +21,16 @@ const FINANCING_OPTIONS = [
   ['alle', 'Alle finansieringer']
 ];
 const MONTH_COLUMNS = Array.from({ length: 12 }, (_, index) => `budsjett_${String(index + 1).padStart(2, '0')}_tusen`);
+const INVESTMENT_ACCOUNTS = ['1250', '1270', '1280', '1281'];
+const investmentAccountList = INVESTMENT_ACCOUNTS.map((account) => `'${account}'`).join(', ');
+const accountFilterSql = (field = 'account') => `(
+  try_cast(${field} as integer) between 5000 and 7834
+  or lpad(trim(${field}), 4, '0') in (${investmentAccountList})
+)`;
 const VALUE_COLUMNS = [
   'virksomhet_budsjett_tusen', 'hovedbok_tusen', 'avvik_tusen',
   'aarets_budsjett_tusen', ...MONTH_COLUMNS, 'kontant_budsjett_tusen',
-  'kontant_tusen', 'kontant_avvik_tusen', 'investeringsbudsjett_tusen',
-  'investeringsregnskap_tusen'
+  'kontant_tusen', 'kontant_avvik_tusen'
 ];
 
 const key = (section, financing, account, period) => [section, financing, account, period].join('|');
@@ -73,7 +78,7 @@ export const buildTask2Report = async (files) => {
           try_cast(amount as double) / 1000.0 as value
         from read_parquet('agltransact.parquet')
         where regexp_matches(trim(period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
-          and try_cast(account as integer) between 5000 and 7834
+          and ${accountFilterSql()}
       `)),
       db.query(expandedQuery(`
         select trim(v.period) as period,
@@ -87,7 +92,7 @@ export const buildTask2Report = async (files) => {
         join read_parquet('apltransactvalue.parquet') v using (trans_id)
         where h.version = substr(trim(v.period), 1, 4) || 'B'
           and regexp_matches(trim(v.period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
-          and try_cast(h.account as integer) between 5000 and 7834
+          and ${accountFilterSql('h.account')}
       `)),
       db.query(expandedQuery(`
         select trim(pay_period) as period,
@@ -97,26 +102,29 @@ export const buildTask2Report = async (files) => {
           try_cast(cash_amount as double) / 1000.0 as value
         from read_parquet('acatrans.parquet')
         where regexp_matches(trim(pay_period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
-          and try_cast(account as integer) between 5000 and 7834
+          and ${accountFilterSql()}
       `)),
       db.query(`
         with accounts as (
-          select distinct lpad(trim(account), 4, '0') as konto from read_parquet('agltransact.parquet') where try_cast(account as integer) between 5000 and 7834
-          union select distinct lpad(trim(account), 4, '0') from read_parquet('apltransact.parquet') where try_cast(account as integer) between 5000 and 7834
-          union select distinct lpad(trim(account), 4, '0') from read_parquet('acatrans.parquet') where try_cast(account as integer) between 5000 and 7834
+          select distinct lpad(trim(account), 4, '0') as konto from read_parquet('agltransact.parquet') where ${accountFilterSql()}
+          union select distinct lpad(trim(account), 4, '0') from read_parquet('apltransact.parquet') where ${accountFilterSql()}
+          union select distinct lpad(trim(account), 4, '0') from read_parquet('acatrans.parquet') where ${accountFilterSql()}
         ), names as (
           select lpad(trim(dim_value), 4, '0') as konto, any_value(trim(description)) as konto_navn
-          from read_parquet('agldimvalue.parquet') where attribute_id = 'A0' and try_cast(dim_value as integer) between 5000 and 7834 group by 1
+          from read_parquet('agldimvalue.parquet') where attribute_id = 'A0' and ${accountFilterSql('dim_value')} group by 1
         ), plan as (
           select cast(Konto as varchar) as prefix, Kontonavn as navn from read_parquet('nkom_kontoplan.parquet')
         )
         select accounts.konto, coalesce(names.konto_navn, 'Kontonavn mangler') as konto_navn,
-          coalesce(main.navn, 'Kontoklasse ' || substr(accounts.konto, 1, 1)) as hovedgruppe,
-          coalesce(sub.navn, 'Kontogruppe ' || substr(accounts.konto, 1, 2)) as undergruppe
+          case when accounts.konto in (${investmentAccountList}) then 'Investeringsrapport'
+               else coalesce(main.navn, 'Kontoklasse ' || substr(accounts.konto, 1, 1)) end as hovedgruppe,
+          case when accounts.konto in (${investmentAccountList}) then 'Varige driftsmidler'
+               else coalesce(sub.navn, 'Kontogruppe ' || substr(accounts.konto, 1, 2)) end as undergruppe
         from accounts left join names using (konto)
         left join plan main on main.prefix = substr(accounts.konto, 1, 1)
         left join plan sub on sub.prefix = substr(accounts.konto, 1, 2)
-        order by try_cast(accounts.konto as integer)
+        order by case when accounts.konto in (${investmentAccountList}) then 0 else 1 end,
+          try_cast(accounts.konto as integer)
       `),
       db.query(`
         with codes as (
@@ -184,12 +192,6 @@ export const buildTask2Report = async (files) => {
             ));
             const periodBudget = sumAvailable(MONTH_COLUMNS.slice(0, endMonth).map((column) => monthly[column]));
             const annualBudget = sumAvailable(Object.values(monthly));
-            const investmentBudget = ['154345', 'alle'].includes(financing)
-              ? sumAvailable(Array.from({ length: endMonth }, (_, index) => budgetMap.get(key(scope.section_code, '154345', number, `${year}${String(index + 1).padStart(2, '0')}`))))
-              : null;
-            const investmentActual = ['154345', 'alle'].includes(financing)
-              ? Array.from({ length: endMonth }, (_, index) => actualMap.get(key(scope.section_code, '154345', number, `${year}${String(index + 1).padStart(2, '0')}`)) ?? 0).reduce((sum, value) => sum + value, 0)
-              : null;
             if (![actualValue, ...Object.values(monthly), cashValue].some((value) => value !== null && Math.abs(Number(value)) > 1e-12)) continue;
             accountsByNumber.set(number, {
               ...context,
@@ -207,8 +209,6 @@ export const buildTask2Report = async (files) => {
               kontant_budsjett_tusen: null,
               kontant_tusen: cashValue,
               kontant_avvik_tusen: null,
-              investeringsbudsjett_tusen: investmentBudget,
-              investeringsregnskap_tusen: investmentActual,
               forbruk_av_aarets_budsjett: annualBudget ? actualValue / annualBudget : null,
               source_file: 'agltransact.parquet; apltransact.parquet; apltransactvalue.parquet; acatrans.parquet'
             });
@@ -225,7 +225,10 @@ export const buildTask2Report = async (files) => {
               reportRows.push({ ...context, excel_row: excelRow++, hovedgruppe: mainGroup, row_type: 'group', radtekst: subgroup, konto: null, konto_navn: null, ...summedValues(subgroupRows), source_file: 'nkom_kontoplan.parquet' });
               for (const row of subgroupRows) reportRows.push({ ...row, excel_row: excelRow++ });
             }
-            reportRows.push({ ...context, excel_row: excelRow++, hovedgruppe: mainGroup, row_type: 'total', radtekst: `Totale ${String(mainGroup).toLocaleLowerCase('nb-NO')}`, konto: null, konto_navn: null, ...summedValues(mainAccounts), source_file: 'nkom_kontoplan.parquet' });
+            const totalLabel = mainGroup === 'Investeringsrapport'
+              ? 'Totale investeringer'
+              : `Totale ${String(mainGroup).toLocaleLowerCase('nb-NO')}`;
+            reportRows.push({ ...context, excel_row: excelRow++, hovedgruppe: mainGroup, row_type: 'total', radtekst: totalLabel, konto: null, konto_navn: null, ...summedValues(mainAccounts), source_file: 'nkom_kontoplan.parquet' });
           }
         }
       }

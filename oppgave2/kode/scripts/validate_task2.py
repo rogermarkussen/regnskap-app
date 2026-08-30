@@ -17,6 +17,7 @@ GENERATED_DIR = SOURCES.generated_dir / "static-app"
 VALIDATION_PARQUET = GENERATED_DIR / "grouped_finance_validation.parquet"
 ROWS_PARQUET = GENERATED_DIR / "grouped_finance_rows.parquet"
 SECTION_ROWS_PARQUET = GENERATED_DIR / "section_grouped_finance_rows.parquet"
+GROUPS_PARQUET = GENERATED_DIR / "account_groups.parquet"
 
 
 def validate_multiyear_parquet_report() -> bool:
@@ -233,6 +234,13 @@ def main() -> None:
             group by finansiering, rapportperiode
             """
         ).df()
+        expected_account_count = conn.execute(
+            f"""
+            select count(distinct konto)
+            from read_parquet('{GROUPS_PARQUET.as_posix()}')
+            where konto is not null
+            """
+        ).fetchone()[0]
     finally:
         conn.close()
 
@@ -287,26 +295,34 @@ def main() -> None:
     if not invalid_totals.empty:
         raise SystemExit("Hver rapport må inneholde nøyaktig én totalrad for Driftskostnader")
 
-    incomplete_account_sets = row_summary[row_summary["account_rows"] != 114]
+    incomplete_account_sets = row_summary[
+        row_summary["account_rows"] != expected_account_count
+    ]
     if not incomplete_account_sets.empty:
-        raise SystemExit("Hver rapport skal vise alle 114 definerte kontoer")
+        raise SystemExit(
+            f"Hver rapport skal vise alle {expected_account_count} definerte kontoer"
+        )
 
     if section_summary.empty:
         raise SystemExit("Seksjonsrapportene mangler")
     invalid_section_choices = section_summary[section_summary["report_choices"] != 16]
     if not invalid_section_choices.empty:
         raise SystemExit("Hver seksjon skal ha alle 16 finansierings-/periodevalg")
-    invalid_section_accounts = section_summary[section_summary["account_rows"] != 16 * 114]
+    invalid_section_accounts = section_summary[
+        section_summary["account_rows"] != 16 * expected_account_count
+    ]
     if not invalid_section_accounts.empty:
-        raise SystemExit("Hver seksjon skal vise alle 114 kontoer i hvert rapportvalg")
+        raise SystemExit(
+            f"Hver seksjon skal vise alle {expected_account_count} kontoer i hvert rapportvalg"
+        )
     invalid_section_totals = section_summary[section_summary["grand_totals"] != 16]
     if not invalid_section_totals.empty:
         raise SystemExit("Hver seksjon skal ha én driftskostnadstotal per rapportvalg")
     if int(section_summary["section_cash_values"].sum()) != 0:
         raise SystemExit("Kontantverdier skal være tomme når kilden ikke kan fordeles på seksjon")
 
-    # Alle-synet for Jan–mar bruker et avstemt Excel-uttrekk. Seksjonene bruker
-    # operativ Parquet og kan derfor ha det dokumenterte avviket på 1,99 tusen.
+    # Jan–mars for alle finansieringer bruker det avstemte operative
+    # Excel-uttrekket når kontant-Parquet ikke er tilgjengelig i datasnapshotet.
     comparable = section_reconciliation[
         ~(
             (section_reconciliation["finansiering"] == "alle")

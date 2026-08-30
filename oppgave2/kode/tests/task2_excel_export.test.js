@@ -24,8 +24,6 @@ const account = (overrides) => ({
   avvik_tusen: -2,
   aarets_budsjett_tusen: 160,
   forbruk_av_aarets_budsjett: 0.2625,
-  investeringsbudsjett_tusen: 0,
-  investeringsregnskap_tusen: 0,
   budsjett_01_tusen: 13,
   budsjett_02_tusen: 14,
   kontant_budsjett_tusen: 0,
@@ -62,7 +60,26 @@ const reportRows = [
     konto_navn: 'Reisekostnader',
     radtekst: '7130 – Reisekostnader'
   }),
-  { row_type: 'total', hovedgruppe: 'Andre driftskostnader', radtekst: 'Totale andre driftskostnader' }
+  { row_type: 'total', hovedgruppe: 'Andre driftskostnader', radtekst: 'Totale andre driftskostnader' },
+  { row_type: 'section', hovedgruppe: 'Investeringsrapport', radtekst: 'Investeringsrapport' },
+  { row_type: 'group', hovedgruppe: 'Investeringsrapport', group_key: 'investering-varige', radtekst: 'Varige driftsmidler' },
+  account({
+    hovedgruppe: 'Investeringsrapport',
+    parent_group_key: 'investering-varige',
+    konto: '1250',
+    konto_navn: 'Inventar',
+    radtekst: '1250 – Inventar',
+    virksomhet_budsjett_tusen: null,
+    hovedbok_tusen: 224,
+    avvik_tusen: null,
+    aarets_budsjett_tusen: null,
+    forbruk_av_aarets_budsjett: null,
+    budsjett_01_tusen: null,
+    budsjett_02_tusen: null,
+    kontant_tusen: null,
+    kontant_avvik_tusen: null
+  }),
+  { row_type: 'total', hovedgruppe: 'Investeringsrapport', radtekst: 'Totale investeringer' }
 ];
 
 test('eksportutvalget tar med full kontostruktur uavhengig av lukkede grupper', () => {
@@ -111,12 +128,26 @@ test('Excel-eksporten lager én formatert rapportfane med metadata og full visni
   assert.equal(sheets[0].sheet, 'Kontogruppering');
   assert.equal(sheets[0].stickyColumnsCount, 2);
   assert.equal(sheets[0].orientation, 'landscape');
+  assert.equal(sheets[0].columns.length, 20);
 
   const accountRow = sheets[0].data.find((row) => row[0]?.value === '5000 – Fast lønn');
   const groupRow = sheets[0].data.find((row) => row[0]?.value === 'Fast lønn');
+  const groupHeader = sheets[0].data.find((row) => row[0]?.value === 'Kontostruktur');
+  const columnHeader = sheets[0].data.find((row) => row[0]?.value === 'Kontogruppe / konto');
   assert.equal(accountRow[0].indent, 1);
   assert.equal(groupRow[0].fontWeight, 'bold');
   assert.equal(groupRow[2].value, 50);
+  assert.notEqual(groupHeader[2].backgroundColor, groupHeader[7].backgroundColor);
+  assert.notEqual(groupHeader[7].backgroundColor, groupHeader[19].backgroundColor);
+  assert.equal(groupHeader[2].leftBorderStyle, 'medium');
+  assert.equal(groupHeader[7].leftBorderStyle, 'medium');
+  assert.equal(groupHeader[19].leftBorderStyle, 'medium');
+  assert.equal(columnHeader[2].leftBorderStyle, 'medium');
+  assert.equal(columnHeader[7].leftBorderStyle, 'medium');
+  assert.equal(columnHeader[19].leftBorderStyle, 'medium');
+  assert.equal(accountRow[2].leftBorderStyle, 'medium');
+  assert.equal(accountRow[7].leftBorderStyle, 'medium');
+  assert.equal(accountRow[19].leftBorderStyle, 'medium');
 
   const buffer = await writeExcelFile(sheets).toBuffer();
   const files = unzipSync(new Uint8Array(buffer));
@@ -134,10 +165,15 @@ test('Excel-eksporten lager én formatert rapportfane med metadata og full visni
   assert.match(allXml, /Kontantregnskap/);
   assert.match(allXml, /Rapportperiode: Januar–mars 2026/);
   assert.match(allXml, /Forbruk av årsbudsjett/);
-  assert.match(allXml, /Investeringsbudsjett/);
-  assert.match(allXml, /Investeringsregnskap/);
+  assert.match(allXml, /Investeringsrapport/);
+  assert.match(allXml, /1250 – Inventar/);
+  assert.doesNotMatch(allXml, /Investeringsbudsjett/);
+  assert.doesNotMatch(allXml, /Investeringsregnskap/);
+  assert.doesNotMatch(allXml, /Årstotal/);
+  assert.doesNotMatch(allXml, /Kontantbudsjett/);
+  assert.doesNotMatch(allXml, /Kontantavvik/);
   assert.match(allXml, /Driftskostnader/);
-  assert.match(worksheetXml, /<mergeCell ref="A1:Y1"\/>/);
+  assert.match(worksheetXml, /<mergeCell ref="A1:T1"\/>/);
   assert.match(worksheetXml, /<pane[^>]*xSplit="2"/);
   assert.match(worksheetXml, /<pane[^>]*ySplit="[1-9][0-9]*"/);
   assert.equal(task2WorkbookFilename('154301', '01–03 2026'), 'kontogruppering-154301-01-03-2026.xlsx');

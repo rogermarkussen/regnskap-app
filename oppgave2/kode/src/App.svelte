@@ -210,7 +210,7 @@
     shortLabel,
     exportLabel
   }));
-  $: fullValueColumns = Array.from({ length: 23 });
+  $: fullValueColumns = Array.from({ length: 18 });
   $: hierarchicalRows = selectReportRows(rows, {
     financing,
     reportPeriod: effectivePeriod,
@@ -225,7 +225,13 @@
       Number(row.hovedbok_tusen) !== 0 &&
       (row.virksomhet_budsjett_tusen === null || row.virksomhet_budsjett_tusen === undefined)
   );
-  $: budgetIsIncomplete = incompleteBudgetAccounts.length > 0;
+  $: operatingIncompleteBudgetAccounts = incompleteBudgetAccounts.filter(
+    (row) => row.hovedgruppe !== 'Investeringsrapport'
+  );
+  $: investmentMissingBudgetAccounts = incompleteBudgetAccounts.filter(
+    (row) => row.hovedgruppe === 'Investeringsrapport'
+  );
+  $: budgetIsIncomplete = operatingIncompleteBudgetAccounts.length > 0;
   $: ({ grandTotal: total, summaryRows, mainGroups, groupKeys } = reportTotals(hierarchicalRows));
   $: filteredRows = filterReportRows(hierarchicalRows, {
     mainGroup,
@@ -354,7 +360,7 @@
         <p><strong>Avvik</strong><span>Budsjett minus hovedbok. Et negativt tall betyr at forbruket er høyere enn budsjettet.</span></p>
         <p><strong>Forbruk</strong><span>Hovedbok som andel av hele årsbudsjettet.</span></p>
         <p><strong>Kontant</strong><span>Utbetalinger og innbetalinger fra kontantregnskapet.</span></p>
-        <p><strong>Investering</strong><span>Budsjett med dim_1 = 212 og hovedbok med finansiering 154345.</span></p>
+        <p><strong>Investeringsrapport</strong><span>Egen hovedgruppe for konto 1250, 1270, 1280 og 1281 fra hovedboken.</span></p>
         <p><strong>Seksjon</strong><span>Operative tall filtrert på seksjonskoden i dim_1.</span></p>
         <p><strong>Tom verdi</strong><span>«–» betyr at kilden ikke har en tallverdi.</span></p>
       </div>
@@ -383,7 +389,7 @@
       <div class="table-scroll compact">
         <table>
           <thead>
-            <tr><th>Kontogruppe</th><th>Budsjett</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th><th>Investeringsbudsjett</th><th>Investeringsregnskap</th></tr>
+            <tr><th>Kontogruppe</th><th>Budsjett</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th></tr>
           </thead>
           <tbody>
             {#each summaryRows as row}
@@ -394,8 +400,6 @@
                 <td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td>
                 <td>{number(row.aarets_budsjett_tusen)}</td>
                 <td>{percent(row.forbruk_av_aarets_budsjett)}</td>
-                <td>{number(row.investeringsbudsjett_tusen)}</td>
-                <td>{number(row.investeringsregnskap_tusen)}</td>
               </tr>
             {/each}
           </tbody>
@@ -447,7 +451,10 @@
       </div>
 
       {#if ['virksomhet', 'full'].includes(view) && budgetIsIncomplete}
-        <p class="source-warning">Budsjett {budgetVersion} mangler poster for {incompleteBudgetAccounts.length} kontoer som har hovedbokstall. Budsjett, avvik og forbruk vises som tomme verdier der sammenligningsgrunnlaget mangler.</p>
+        <p class="source-warning">Budsjett {budgetVersion} mangler poster for {operatingIncompleteBudgetAccounts.length} driftskontoer som har hovedbokstall. Budsjett, avvik og forbruk vises som tomme verdier der sammenligningsgrunnlaget mangler.</p>
+      {/if}
+      {#if ['virksomhet', 'full'].includes(view) && investmentMissingBudgetAccounts.length > 0}
+        <p class="source-warning">Investeringskontoene har hovedbokstall, men ingen budsjettposter i den valgte datamappen. Budsjett, avvik og forbruk vises derfor som tomme verdier i investeringsrapporten.</p>
       {/if}
 
       {#if ['kontant', 'full'].includes(view) && sectionCode !== 'all'}
@@ -473,22 +480,22 @@
               <tr class="column-groups">
                 <th class="sticky-col" rowspan="2">Kontogruppe / konto</th>
                 <th rowspan="2">Type</th>
-                <th colspan="7">Virksomhetsregnskap</th>
-                <th colspan="13">Månedsbudsjett</th>
-                <th colspan="3">Kontantregnskap</th>
+                <th class="business-group group-start" colspan="5">Virksomhetsregnskap</th>
+                <th class="monthly-group group-start" colspan="12">Månedsbudsjett</th>
+                <th class="cash-group group-start cash-start">Kontantregnskap</th>
               </tr>
               <tr class="column-labels">
-                <th>Budsjett</th><th><abbr title="Hovedbok">H.bok</abbr></th><th>Avvik</th><th><abbr title="Årsbudsjett">Årsbud.</abbr></th><th>Forbruk</th><th><abbr title="Investeringsbudsjett">Inv.bud.</abbr></th><th><abbr title="Investeringsregnskap">Inv.regn.</abbr></th>
-                {#each monthOptions as month}<th>{month.shortLabel}</th>{/each}<th class="month-total">Årstotal</th>
-                <th>Budsjett</th><th>Kontant</th><th>Avvik</th>
+                <th class="business-head group-start">Budsjett</th><th class="business-head"><abbr title="Hovedbok">H.bok</abbr></th><th class="business-head">Avvik</th><th class="business-head"><abbr title="Årsbudsjett">Årsbud.</abbr></th><th class="business-head">Forbruk</th>
+                {#each monthOptions as month}<th class="monthly-head" class:group-start={month.month === 1}>{month.shortLabel}</th>{/each}
+                <th class="cash-head group-start cash-start">Kontant</th>
               </tr>
             {:else}
               <tr>
                 <th class="sticky-col">Kontogruppe / konto</th><th>Type</th>
                 {#if view === 'virksomhet'}
-                  <th>Budsjett {periodText}</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th><th>Investeringsbudsjett</th><th>Investeringsregnskap</th>
+                  <th>Budsjett {periodText}</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th>
                 {:else if view === 'kontant'}
-                  <th>Kontantbudsjett</th><th>Kontant</th><th>Avvik</th>
+                  <th>Kontant</th>
                 {/if}
               </tr>
             {/if}
@@ -508,13 +515,13 @@
                 </td>
                 <td><span class="type-badge">{row.row_type === 'account' ? 'Konto' : row.row_type === 'group' ? 'Gruppe' : row.row_type === 'total' ? 'Total' : 'Hovedgruppe'}</span></td>
                 {#if view === 'virksomhet'}
-                  <td>{number(row.virksomhet_budsjett_tusen)}</td><td>{number(row.hovedbok_tusen)}</td><td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td>{number(row.aarets_budsjett_tusen)}</td><td>{percent(row.forbruk_av_aarets_budsjett)}</td><td>{number(row.investeringsbudsjett_tusen)}</td><td>{number(row.investeringsregnskap_tusen)}</td>
+                  <td>{number(row.virksomhet_budsjett_tusen)}</td><td>{number(row.hovedbok_tusen)}</td><td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td>{number(row.aarets_budsjett_tusen)}</td><td>{percent(row.forbruk_av_aarets_budsjett)}</td>
                 {:else if view === 'kontant'}
-                  <td>{number(row.kontant_budsjett_tusen)}</td><td>{number(row.kontant_tusen)}</td><td class:bad={Number(row.kontant_avvik_tusen) < 0}>{number(row.kontant_avvik_tusen)}</td>
+                  <td>{number(row.kontant_tusen)}</td>
                 {:else if view === 'full'}
-                  <td>{number(row.virksomhet_budsjett_tusen)}</td><td>{number(row.hovedbok_tusen)}</td><td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td>{number(row.aarets_budsjett_tusen)}</td><td>{percent(row.forbruk_av_aarets_budsjett)}</td><td>{number(row.investeringsbudsjett_tusen)}</td><td>{number(row.investeringsregnskap_tusen)}</td>
-                  {#each monthOptions as month}<td>{number(budgetMonthValue(row, month.month))}</td>{/each}<td class="month-total">{number(row.aarets_budsjett_tusen)}</td>
-                  <td>{number(row.kontant_budsjett_tusen)}</td><td>{number(row.kontant_tusen)}</td><td class:bad={Number(row.kontant_avvik_tusen) < 0}>{number(row.kontant_avvik_tusen)}</td>
+                  <td class="business-cell group-start">{number(row.virksomhet_budsjett_tusen)}</td><td class="business-cell">{number(row.hovedbok_tusen)}</td><td class="business-cell" class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td class="business-cell">{number(row.aarets_budsjett_tusen)}</td><td class="business-cell">{percent(row.forbruk_av_aarets_budsjett)}</td>
+                  {#each monthOptions as month}<td class="monthly-cell" class:group-start={month.month === 1}>{number(budgetMonthValue(row, month.month))}</td>{/each}
+                  <td class="cash-cell group-start cash-start">{number(row.kontant_tusen)}</td>
                 {/if}
               </tr>
             {/each}

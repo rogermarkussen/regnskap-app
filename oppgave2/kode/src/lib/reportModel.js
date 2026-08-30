@@ -53,7 +53,9 @@ export const filterReportRows = (
 };
 
 export const reportTotals = (rows) => {
-  const accountRows = rows.filter((row) => row.row_type === 'account');
+  const accountRows = rows.filter(
+    (row) => row.row_type === 'account' && row.hovedgruppe !== 'Investeringsrapport'
+  );
   const sum = (column) => {
     const values = accountRows
       .map((row) => row[column])

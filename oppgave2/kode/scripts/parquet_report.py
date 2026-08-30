@@ -30,6 +30,15 @@ FINANCING_OPTIONS = (
     ("154322+045101", "Finansiering 154322 + 045101"),
     ("alle", "Alle finansieringer"),
 )
+INVESTMENT_ACCOUNTS = ("1250", "1270", "1280", "1281")
+
+
+def _account_filter_sql(field: str = "account") -> str:
+    account_list = ", ".join(f"'{account}'" for account in INVESTMENT_ACCOUNTS)
+    return f"""(
+        try_cast({field} as integer) between 5000 and 7834
+        or lpad(trim({field}), 4, '0') in ({account_list})
+    )"""
 
 
 @dataclass(frozen=True)
@@ -77,7 +86,7 @@ def _expanded_values(
               try_cast(amount as double) / 1000.0 as value
             from read_parquet('{sources.ledger.as_posix()}') a
             where regexp_matches(trim(period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(account as integer) between 5000 and 7834
+              and {_account_filter_sql()}
         """
     elif source == "budget":
         base = f"""
@@ -94,7 +103,7 @@ def _expanded_values(
             join read_parquet('{sources.budget_values.as_posix()}') v using (trans_id)
             where h.version = substr(trim(v.period), 1, 4) || 'B'
               and regexp_matches(trim(v.period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(h.account as integer) between 5000 and 7834
+              and {_account_filter_sql('h.account')}
         """
     elif source == "cash":
         base = f"""
@@ -106,7 +115,7 @@ def _expanded_values(
               try_cast(cash_amount as double) / 1000.0 as value
             from read_parquet('{sources.cash_ledger.as_posix()}') c
             where regexp_matches(trim(pay_period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(account as integer) between 5000 and 7834
+              and {_account_filter_sql()}
         """
     else:
         raise ValueError(f"Ukjent kilde: {source}")
@@ -138,22 +147,22 @@ def _account_structure(
         with accounts as (
           select distinct lpad(trim(account), 4, '0') as konto
           from read_parquet('{sources.ledger.as_posix()}')
-          where try_cast(account as integer) between 5000 and 7834
+          where {_account_filter_sql()}
           union
           select distinct lpad(trim(account), 4, '0')
           from read_parquet('{sources.budget_header.as_posix()}')
-          where try_cast(account as integer) between 5000 and 7834
+          where {_account_filter_sql()}
           union
           select distinct lpad(trim(account), 4, '0')
           from read_parquet('{sources.cash_ledger.as_posix()}')
-          where try_cast(account as integer) between 5000 and 7834
+          where {_account_filter_sql()}
         ), names as (
           select
             lpad(trim(dim_value), 4, '0') as konto,
             any_value(trim(description)) as konto_navn
           from read_parquet('{sources.dimension_values.as_posix()}')
           where attribute_id = 'A0'
-            and try_cast(dim_value as integer) between 5000 and 7834
+            and {_account_filter_sql('dim_value')}
           group by 1
         ), plan as (
           select cast(Konto as varchar) as prefix, Kontonavn as navn
@@ -162,15 +171,20 @@ def _account_structure(
         select
           accounts.konto,
           coalesce(names.konto_navn, 'Kontonavn mangler') as konto_navn,
-          substr(accounts.konto, 1, 1) as hovedgruppekode,
-          coalesce(main.navn, 'Kontoklasse ' || substr(accounts.konto, 1, 1)) as hovedgruppe,
-          substr(accounts.konto, 1, 2) as undergruppekode,
-          coalesce(sub.navn, 'Kontogruppe ' || substr(accounts.konto, 1, 2)) as undergruppe
+          case when accounts.konto in ('1250', '1270', '1280', '1281') then 'I'
+               else substr(accounts.konto, 1, 1) end as hovedgruppekode,
+          case when accounts.konto in ('1250', '1270', '1280', '1281') then 'Investeringsrapport'
+               else coalesce(main.navn, 'Kontoklasse ' || substr(accounts.konto, 1, 1)) end as hovedgruppe,
+          case when accounts.konto in ('1250', '1270', '1280', '1281') then 'II'
+               else substr(accounts.konto, 1, 2) end as undergruppekode,
+          case when accounts.konto in ('1250', '1270', '1280', '1281') then 'Varige driftsmidler'
+               else coalesce(sub.navn, 'Kontogruppe ' || substr(accounts.konto, 1, 2)) end as undergruppe
         from accounts
         left join names using (konto)
         left join plan main on main.prefix = substr(accounts.konto, 1, 1)
         left join plan sub on sub.prefix = substr(accounts.konto, 1, 2)
-        order by try_cast(accounts.konto as integer)
+        order by case when accounts.konto in ('1250', '1270', '1280', '1281') then 0 else 1 end,
+          try_cast(accounts.konto as integer)
         """
     ).df()
     return rows.to_dict("records")
@@ -312,8 +326,6 @@ def build_parquet_report(
         "kontant_budsjett_tusen",
         "kontant_tusen",
         "kontant_avvik_tusen",
-        "investeringsbudsjett_tusen",
-        "investeringsregnskap_tusen",
     ]
     report_rows: list[dict[str, object]] = []
     grouped_structure: dict[str, dict[str, list[dict[str, object]]]] = defaultdict(
@@ -361,29 +373,6 @@ def build_parquet_report(
                         ]
                     )
                     annual_budget = _sum_available(list(monthly.values()))
-                    investment_budget = None
-                    investment_actual = None
-                    if financing in {"154345", "alle"}:
-                        investment_budget = _sum_available(
-                            [
-                                budget_map.get(
-                                    (
-                                        section_code,
-                                        "154345",
-                                        number,
-                                        f"{year}{month:02d}",
-                                    )
-                                )
-                                for month in range(1, end_month + 1)
-                            ]
-                        )
-                        investment_actual = sum(
-                            actual_map.get(
-                                (section_code, "154345", number, f"{year}{month:02d}"),
-                                0.0,
-                            )
-                            for month in range(1, end_month + 1)
-                        )
                     has_data = any(
                         abs(float(value)) > 1e-12
                         for value in [actual_value, *monthly.values(), cash_value]
@@ -420,8 +409,6 @@ def build_parquet_report(
                         "kontant_budsjett_tusen": None,
                         "kontant_tusen": cash_value,
                         "kontant_avvik_tusen": None,
-                        "investeringsbudsjett_tusen": investment_budget,
-                        "investeringsregnskap_tusen": investment_actual,
                         "forbruk_av_aarets_budsjett": (
                             None
                             if annual_budget in (None, 0)
@@ -502,7 +489,11 @@ def build_parquet_report(
                             "excel_row": excel_row,
                             "hovedgruppe": main_group,
                             "row_type": "total",
-                            "radtekst": f"Totale {main_group.lower()}",
+                            "radtekst": (
+                                "Totale investeringer"
+                                if main_group == "Investeringsrapport"
+                                else f"Totale {main_group.lower()}"
+                            ),
                             "konto": None,
                             "konto_navn": None,
                             **_summed_values(main_accounts, value_columns),

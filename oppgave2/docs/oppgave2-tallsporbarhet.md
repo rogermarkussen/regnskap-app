@@ -42,8 +42,8 @@ Kartleggingen av de operative Parquet-filene viser følgende:
 | Virksomhetsregnskap | `agltransact.parquet`, feltet `amount`, gruppert på `account`, `dim_4` og `period` | Kan beregnes fra Parquet |
 | Virksomhetsbudsjett | `apltransact.parquet` koblet med `apltransactvalue.parquet` via `trans_id`, filtrert på versjon `2026B` | Kan beregnes fra Parquet for alle tolv måneder |
 | Kontantregnskap | Ingen egen Parquet-tabell eller felt som gir samme kontantverdier som Excel-rapporten | Må fortsatt hentes fra operativ Excel-kilde eller en ny kontantkilde |
-| Investeringsregnskap | `agltransact.parquet`, filtrert på `dim_4 = 154345` | Godkjent investeringsregel |
-| Investeringsbudsjett | `2026B` fra `apltransact*.parquet`, filtrert på `dim_1 = 212` | Godkjent investeringsregel |
+| Investeringsrapport | `agltransact.parquet`, konto 1250, 1270, 1280 og 1281 | Egen hovedgruppe med samme periode-, finansierings- og seksjonsfilter som rapporten ellers |
+| Investeringsbudsjett | Ingen budsjettposter for de fire investeringskontoene i valgt operativt grunnlag | Budsjett, avvik og forbruk holdes tomme |
 | Seksjon/kostnadssted | `dim_1` i hovedbok og budsjett, navn fra dimensjonsregisterets `attribute_id = C1` | Kan filtreres fra operative Parquet-kilder |
 
 Hovedboksfilen inneholder perioder fra `202601` til `202607`, mens
@@ -72,8 +72,7 @@ totalverdier og fyller ikke inn null.
 | Avvik | `calculated_account_values` | Budsjett minus hovedbok |
 | Forbruk | `_summed_values` og kontoberegningen | Hovedbok delt på årsbudsjett |
 | Kontant | Operativt Excel-uttrekk | Uavhengig Parquet-kilde finnes ikke ennå |
-| Investeringsbudsjett | `calculated_account_values` for `154345` | Periodebudsjett med `dim_1 = 212` |
-| Investeringsregnskap | `calculated_account_values` for `154345` | Akkumulert hovedbok med `dim_4 = 154345` |
+| Investeringsrapport | `build_parquet_report` / `buildTask2Report` | Hovedbok for konto 1250, 1270, 1280 og 1281, gruppert under «Varige driftsmidler» |
 
 ## Finansieringsregler
 
@@ -82,7 +81,7 @@ totalverdier og fyller ikke inn null.
 | `154301` | `dim_4 = 154301` | Eksisterende operative detaljkilde for Jan–mar; Parquet for øvrige perioder | Jan–mar, Jan–apr, Jan–jun |
 | `154345` | `dim_4 = 154345` | `dim_1 = 212` | Jan–mar, Jan–apr, Jan–jun |
 | `154322+045101` | `dim_4 IN (154322, 045101)` | `dim_1 = 761` | Jan–mar, Jan–apr, Jan–jun |
-| Alle | Alle finansieringskoder i Parquet, avgrenset til konto 5000–7834 | Hele `2026B` | Alle tilgjengelige måneder |
+| Alle | Summen av rapportens finansieringsvalg, med driftskonto 5000–7834 og investeringskonto 1250, 1270, 1280 og 1281 | Hele `2026B`; manglende investeringsbudsjett beholdes tomt | Alle tilgjengelige måneder |
 
 Excel-fasiten for januar–mars 2026 bekrefter denne avgrensningen. Den
 beregnede hovedboken er 97 658,4861 tusen kroner både i Parquet og fasit.
@@ -98,9 +97,8 @@ Månedsvisningen er uavhengig av det akkumulerte periodevalget og viser alltid
 budsjettet for alle tolv måneder fra januar til desember. For perioden
 `Jan–jun` beregnes periodebudsjettet som summen av januar, februar, mars,
 april, mai og juni. Hovedboken summeres tilsvarende til og med periode
-`202606`. Kolonnen `Totalt alle måneder` etter desember er summen av januar
-til desember og tilsvarer årets budsjett. Den samme kolonnen er med i
-Excel-eksportens månedsfane.
+`202606`. Årsbudsjettet er summen av januar til desember. Fullvisningen og
+Excel-eksporten gjentar derfor ikke den samme summen etter desember.
 
 ## Testdekning
 

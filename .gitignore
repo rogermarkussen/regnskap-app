@@ -26,3 +26,7 @@ test-results/
 **/Fasit/
 **/outputs/
 **/static/*.xlsx
+
+# Lokale kildemapper. Innholdet beholdes på maskinen, men skal ikke versjoneres.
+/korrekt-data/
+/eposter/

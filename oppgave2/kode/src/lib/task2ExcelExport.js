@@ -1,4 +1,4 @@
-const TOTAL_COLUMNS = 25;
+const TOTAL_COLUMNS = 20;
 const MONTH_COLUMNS = Array.from(
   { length: 12 },
   (_, index) => `budsjett_${String(index + 1).padStart(2, '0')}_tusen`
@@ -8,8 +8,6 @@ const SUM_COLUMNS = [
   'hovedbok_tusen',
   'avvik_tusen',
   'aarets_budsjett_tusen',
-  'investeringsbudsjett_tusen',
-  'investeringsregnskap_tusen',
   ...MONTH_COLUMNS,
   'kontant_budsjett_tusen',
   'kontant_tusen',
@@ -22,6 +20,14 @@ const colors = {
   paleTeal: '#DDEEEE',
   paleGreen: '#DDF2AF',
   paleBlue: '#E9F0F5',
+  businessHeader: '#D7E5EC',
+  businessColumn: '#E8F0F4',
+  monthlyHeader: '#D9ECE9',
+  monthlyColumn: '#EDF7F5',
+  cashHeader: '#EFE4D1',
+  cashColumn: '#F8F0E2',
+  groupDivider: '#8BA4B4',
+  cashDivider: '#B49A68',
   line: '#C9D5DE',
   white: '#FFFFFF',
   ink: '#142D42',
@@ -130,11 +136,16 @@ export const selectTask2ExportRows = (
   }
 
   if (selectedAccounts.length) {
-    result.push({
-      row_type: 'grand_total',
-      radtekst: 'Driftskostnader',
-      ...aggregateAccounts(selectedAccounts)
-    });
+    const operatingAccounts = selectedAccounts.filter(
+      (row) => row.hovedgruppe !== 'Investeringsrapport'
+    );
+    if (operatingAccounts.length) {
+      result.push({
+        row_type: 'grand_total',
+        radtekst: 'Driftskostnader',
+        ...aggregateAccounts(operatingAccounts)
+      });
+    }
   }
   return result;
 };
@@ -156,7 +167,7 @@ const borderStyle = {
   borderStyle: 'thin'
 };
 
-const headerCell = (value) => ({
+const headerCell = (value, style = {}) => ({
   value,
   fontWeight: 'bold',
   textColor: colors.white,
@@ -165,7 +176,8 @@ const headerCell = (value) => ({
   alignVertical: 'center',
   wrap: true,
   height: 34,
-  ...borderStyle
+  ...borderStyle,
+  ...style
 });
 
 const numberCell = (value, style) => {
@@ -233,21 +245,34 @@ const reportRow = (row) => {
     ...borderStyle,
     ...style
   };
+  const businessStartStyle = {
+    ...style,
+    leftBorderColor: colors.groupDivider,
+    leftBorderStyle: 'medium'
+  };
+  const monthlyStartStyle = {
+    ...style,
+    leftBorderColor: colors.groupDivider,
+    leftBorderStyle: 'medium'
+  };
+  const cashStartStyle = {
+    ...style,
+    leftBorderColor: colors.cashDivider,
+    leftBorderStyle: 'medium'
+  };
   return [
     labelCell,
     textCell(typeLabel(row.row_type)),
-    numberCell(row.virksomhet_budsjett_tusen, style),
+    numberCell(row.virksomhet_budsjett_tusen, businessStartStyle),
     numberCell(row.hovedbok_tusen, style),
     numberCell(row.avvik_tusen, style),
     numberCell(row.aarets_budsjett_tusen, style),
     percentageCell,
-    numberCell(row.investeringsbudsjett_tusen, style),
-    numberCell(row.investeringsregnskap_tusen, style),
-    ...MONTH_COLUMNS.map((column) => numberCell(row[column], style)),
-    numberCell(row.aarets_budsjett_tusen, style),
-    numberCell(row.kontant_budsjett_tusen, style),
-    numberCell(row.kontant_tusen, style),
-    numberCell(row.kontant_avvik_tusen, style)
+    ...MONTH_COLUMNS.map((column, index) => numberCell(
+      row[column],
+      index === 0 ? monthlyStartStyle : style
+    )),
+    numberCell(row.kontant_tusen, cashStartStyle)
   ];
 };
 
@@ -257,7 +282,7 @@ const metadataRows = (metadata) => {
     const left = metadata[index];
     const right = metadata[index + 1];
     rows.push([
-      ...mergedCellGroup(`${left.label}: ${left.value ?? ''}`, 12, {
+      ...mergedCellGroup(`${left.label}: ${left.value ?? ''}`, 9, {
         fontWeight: 'bold',
         textColor: colors.ink,
         backgroundColor: colors.paleBlue,
@@ -265,7 +290,7 @@ const metadataRows = (metadata) => {
         ...borderStyle
       }),
       null,
-      ...mergedCellGroup(right ? `${right.label}: ${right.value ?? ''}` : '', 12, {
+      ...mergedCellGroup(right ? `${right.label}: ${right.value ?? ''}` : '', 10, {
         fontWeight: 'bold',
         textColor: colors.ink,
         backgroundColor: colors.paleBlue,
@@ -286,26 +311,58 @@ export const createTask2WorkbookSheets = ({
   const metadataData = metadataRows(metadata);
   const groupHeader = [
     ...mergedCellGroup('Kontostruktur', 2, headerCell('Kontostruktur')),
-    ...mergedCellGroup('Virksomhetsregnskap', 7, headerCell('Virksomhetsregnskap')),
-    ...mergedCellGroup('Månedsbudsjett', 13, headerCell('Månedsbudsjett')),
-    ...mergedCellGroup('Kontantregnskap', 3, headerCell('Kontantregnskap'))
+    ...mergedCellGroup('Virksomhetsregnskap', 5, headerCell('Virksomhetsregnskap', {
+      textColor: colors.ink,
+      backgroundColor: colors.businessHeader,
+      leftBorderColor: colors.groupDivider,
+      leftBorderStyle: 'medium'
+    })),
+    ...mergedCellGroup('Månedsbudsjett', 12, headerCell('Månedsbudsjett', {
+      textColor: '#185E60',
+      backgroundColor: colors.monthlyHeader,
+      leftBorderColor: colors.groupDivider,
+      leftBorderStyle: 'medium'
+    })),
+    ...mergedCellGroup('Kontantregnskap', 1, headerCell('Kontantregnskap', {
+      textColor: '#6C552D',
+      backgroundColor: colors.cashHeader,
+      leftBorderColor: colors.cashDivider,
+      leftBorderStyle: 'medium'
+    }))
   ];
+  const divider = {
+    leftBorderColor: colors.groupDivider,
+    leftBorderStyle: 'medium'
+  };
   const columnHeader = [
-    'Kontogruppe / konto',
-    'Type',
-    `Budsjett ${periodText}`,
-    'Hovedbok',
-    'Avvik',
-    'Årsbudsjett',
-    'Forbruk av årsbudsjett',
-    'Investeringsbudsjett',
-    'Investeringsregnskap',
-    ...Array.from({ length: 12 }, (_, index) => monthLabels[index] ?? `Måned ${index + 1}`),
-    'Årstotal',
-    'Kontantbudsjett',
-    'Kontant',
-    'Kontantavvik'
-  ].map(headerCell);
+    headerCell('Kontogruppe / konto'),
+    headerCell('Type'),
+    ...[
+      `Budsjett ${periodText}`,
+      'Hovedbok',
+      'Avvik',
+      'Årsbudsjett',
+      'Forbruk av årsbudsjett'
+    ].map((value, index) => headerCell(value, {
+      textColor: colors.ink,
+      backgroundColor: colors.businessColumn,
+      ...(index === 0 ? divider : {})
+    })),
+    ...Array.from({ length: 12 }, (_, index) => headerCell(
+      monthLabels[index] ?? `Måned ${index + 1}`,
+      {
+        textColor: '#285D5E',
+        backgroundColor: colors.monthlyColumn,
+        ...(index === 0 ? divider : {})
+      }
+    )),
+    headerCell('Kontant', {
+      textColor: '#6C552D',
+      backgroundColor: colors.cashColumn,
+      leftBorderColor: colors.cashDivider,
+      leftBorderStyle: 'medium'
+    })
+  ];
   const data = [
     mergedRow('Kontogruppering', {
       fontSize: 20,
@@ -336,7 +393,7 @@ export const createTask2WorkbookSheets = ({
     columns: [
       { width: 38 },
       { width: 13 },
-      ...Array.from({ length: 23 }, () => ({ width: 13 }))
+      ...Array.from({ length: 18 }, () => ({ width: 13 }))
     ],
     stickyRowsCount,
     stickyColumnsCount: 2,
