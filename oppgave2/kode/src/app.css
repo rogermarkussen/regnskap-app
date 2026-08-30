@@ -27,6 +27,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 
 .report-shell { width: min(1560px, 100%); margin: 0 auto; padding: 18px 18px 52px; }
+.report-shell.full-view { width: 100%; max-width: none; padding-right: 10px; padding-left: 10px; }
 .masthead {
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
   min-height: 158px; padding: 28px 32px; color: white; overflow: hidden;
@@ -61,10 +62,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .period-switch { display: flex; min-width: 0; padding: 3px; background: #e8eef2; border-radius: 6px; }
 .period-switch button { flex: 1; min-height: 35px; padding: 6px 9px; color: #526579; background: transparent; border: 0; border-radius: 4px; font-size: 11px; font-weight: 700; }
 .period-switch button.active { color: white; background: var(--fjord); box-shadow: 0 2px 5px rgba(18, 66, 84, .18); }
-.period-selects { gap: 6px; background: transparent; }
-.period-selects label { display: grid; flex: 1; gap: 4px; }
-.period-selects label > span { color: var(--muted); font-size: 10px; font-weight: 750; }
+.period-selects { display: grid; grid-template-columns: auto minmax(250px, 1fr); gap: 8px; align-items: end; background: transparent; }
+.period-selects label { display: grid; gap: 4px; }
+.period-selects label > span, .year-picker legend { color: var(--muted); font-size: 10px; font-weight: 750; }
 .period-selects select { min-height: 41px; padding: 7px 9px; border: 1px solid #bdcad3; border-radius: 5px; background: white; color: var(--ink); }
+.year-picker { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
+.year-picker legend { margin: 0; padding: 0; }
+.year-options { display: flex; gap: 4px; padding: 3px; border: 1px solid #c7d8e4; border-radius: 8px; background: #edf4f8; }
+.year-options button { min-width: 42px; height: 35px; padding: 0 9px; color: #45657d; background: transparent; border: 0; border-radius: 5px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.year-options button:hover { color: var(--navy); background: white; }
+.year-options button.active { color: white; background: var(--fjord); box-shadow: 0 2px 5px rgba(18, 66, 84, .18); }
 
 .finance-switch { display: flex; flex-wrap: wrap; gap: 5px; width: max-content; max-width: 100%; margin: 20px 0 8px; padding: 4px; background: white; border: 1px solid var(--rule); border-radius: 7px; }
 .finance-switch button, .segmented button { padding: 9px 14px; color: #506276; background: transparent; border: 0; border-radius: 4px; font-weight: 700; }
@@ -105,6 +112,21 @@ th:first-child, td:first-child { text-align: left; }
 .grand-total th, .grand-total td, .total-row td { font-weight: 800; background: #edf5f6; }
 .bad { color: var(--danger); }
 .detail-table { min-width: 920px; }
+.detail-table.full-table { min-width: 0; table-layout: fixed; font-size: 10px; }
+.full-table col.full-label-column { width: 17%; }
+.full-table col.full-type-column { width: 5.5%; }
+.full-table col.full-value-column { width: 3.37%; }
+.full-table th, .full-table td { padding: 7px 3px; }
+.full-table thead th { padding-right: 1px; padding-left: 1px; font-size: clamp(7px, .55vw, 9px); letter-spacing: 0; white-space: normal; line-height: 1.2; }
+.full-table thead abbr { text-decoration: none; }
+.full-table tbody td:not(.sticky-col) { overflow: hidden; text-overflow: ellipsis; }
+.full-table .sticky-col { width: auto; min-width: 0; max-width: none; }
+.full-table .account-indent { padding-left: 18px; }
+.full-table .type-badge { padding: 2px 3px; font-size: 7px; letter-spacing: 0; }
+.full-view .detail-scroll { overflow-x: clip; }
+.column-groups th { top: 0; color: #244b65; background: #dbe8ed; border-bottom-color: #c3d3dc; }
+.column-labels th { top: 31px; }
+.column-groups th + th { border-left: 1px solid #c3d3dc; }
 .sticky-col { position: sticky !important; left: 0; z-index: 2; width: 35%; min-width: 285px; max-width: 480px; overflow: hidden; background: white; text-overflow: ellipsis; }
 .detail-table thead .sticky-col { z-index: 5; background: #eaf0f4; }
 .section-row td { color: white; background: var(--navy) !important; border-bottom-color: #355a76; font-weight: 800; }
@@ -147,6 +169,10 @@ th:first-child, td:first-child { text-align: left; }
   .segmented { grid-column: 1 / -1; width: max-content; }
   .help-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 1179px) {
+  .detail-table.full-table { min-width: 1180px; }
+  .full-view .detail-scroll { overflow-x: auto; }
+}
 @media (max-width: 760px) {
   .report-shell { padding: 0 0 36px; }
   .masthead { align-items: flex-start; min-height: 0; padding: 24px 20px 27px; border-radius: 0; }
@@ -154,8 +180,9 @@ th:first-child, td:first-child { text-align: left; }
   .scope-bar { grid-template-columns: 1fr; margin: 0; padding: 15px 16px 17px; border-right: 0; border-left: 0; }
   .scope-heading { grid-column: auto; }
   .scope-period { min-width: 0; }
-  .period-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .period-switch { display: grid; grid-template-columns: 1fr; }
   .period-switch button { min-width: 0; }
+  .year-options button { flex: 1 1 0; }
   .finance-switch, .context-line, .report-help, .metric-grid, .panel, .report-footer { margin-right: 12px; margin-left: 12px; }
   .finance-switch { width: calc(100% - 24px); }
   .finance-switch button { flex: 1 1 42%; }

@@ -24,7 +24,6 @@ MONTH_NAMES = (
     "November",
     "Desember",
 )
-FINANCING_MEMBERS = ("154301", "154345", "154322", "045101")
 FINANCING_OPTIONS = (
     ("154301", "Finansiering 154301"),
     ("154345", "Finansiering 154345"),
@@ -78,7 +77,7 @@ def _expanded_values(
               try_cast(amount as double) / 1000.0 as value
             from read_parquet('{sources.ledger.as_posix()}') a
             where regexp_matches(trim(period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(account as integer) between 3000 and 8999
+              and try_cast(account as integer) between 5000 and 7834
         """
     elif source == "budget":
         base = f"""
@@ -95,7 +94,7 @@ def _expanded_values(
             join read_parquet('{sources.budget_values.as_posix()}') v using (trans_id)
             where h.version = substr(trim(v.period), 1, 4) || 'B'
               and regexp_matches(trim(v.period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(h.account as integer) between 3000 and 8999
+              and try_cast(h.account as integer) between 5000 and 7834
         """
     elif source == "cash":
         base = f"""
@@ -107,7 +106,7 @@ def _expanded_values(
               try_cast(cash_amount as double) / 1000.0 as value
             from read_parquet('{sources.cash_ledger.as_posix()}') c
             where regexp_matches(trim(pay_period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
-              and try_cast(account as integer) between 3000 and 8999
+              and try_cast(account as integer) between 5000 and 7834
         """
     else:
         raise ValueError(f"Ukjent kilde: {source}")
@@ -139,22 +138,22 @@ def _account_structure(
         with accounts as (
           select distinct lpad(trim(account), 4, '0') as konto
           from read_parquet('{sources.ledger.as_posix()}')
-          where try_cast(account as integer) between 3000 and 8999
+          where try_cast(account as integer) between 5000 and 7834
           union
           select distinct lpad(trim(account), 4, '0')
           from read_parquet('{sources.budget_header.as_posix()}')
-          where try_cast(account as integer) between 3000 and 8999
+          where try_cast(account as integer) between 5000 and 7834
           union
           select distinct lpad(trim(account), 4, '0')
           from read_parquet('{sources.cash_ledger.as_posix()}')
-          where try_cast(account as integer) between 3000 and 8999
+          where try_cast(account as integer) between 5000 and 7834
         ), names as (
           select
             lpad(trim(dim_value), 4, '0') as konto,
             any_value(trim(description)) as konto_navn
           from read_parquet('{sources.dimension_values.as_posix()}')
           where attribute_id = 'A0'
-            and try_cast(dim_value as integer) between 3000 and 8999
+            and try_cast(dim_value as integer) between 5000 and 7834
           group by 1
         ), plan as (
           select cast(Konto as varchar) as prefix, Kontonavn as navn

@@ -82,7 +82,12 @@ totalverdier og fyller ikke inn null.
 | `154301` | `dim_4 = 154301` | Eksisterende operative detaljkilde for Jan–mar; Parquet for øvrige perioder | Jan–mar, Jan–apr, Jan–jun |
 | `154345` | `dim_4 = 154345` | `dim_1 = 212` | Jan–mar, Jan–apr, Jan–jun |
 | `154322+045101` | `dim_4 IN (154322, 045101)` | `dim_1 = 761` | Jan–mar, Jan–apr, Jan–jun |
-| Alle | Operativt uttrekk for Jan–mar; Parquet for øvrige perioder | Hele `2026B` | Jan–mar, Jan–apr, Jan–jun |
+| Alle | Alle finansieringskoder i Parquet, avgrenset til konto 5000–7834 | Hele `2026B` | Alle tilgjengelige måneder |
+
+Excel-fasiten for januar–mars 2026 bekrefter denne avgrensningen. Den
+beregnede hovedboken er 97 658,4861 tusen kroner både i Parquet og fasit.
+Utvalget inkluderer finansieringskoder uten eget filtervalg, men holder
+inntekts- og finansposter utenfor driftskostnadsrapporten.
 
 Alle rapportvalg har i tillegg perioden `Til nyeste komplette måned`.
 Komplett betyr at hovedboken har minst ett bilag datert til månedens siste

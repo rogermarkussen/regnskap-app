@@ -89,7 +89,12 @@ to regnskapene har forskjellig periodisering.
 | `154301` | `dim_4 = 154301` | Budsjett uten `dim_1 = 212` og `dim_1 = 761` |
 | `154345` | `dim_4 = 154345` | `dim_1 = 212` |
 | `154322 + 045101` | `dim_4 IN (154322, 045101)` | `dim_1 = 761` |
-| Alle finansieringer | Summen av rapportens finansieringer | Hele budsjettversjon `2026B` |
+| Alle finansieringer | Alle finansieringskoder på driftskostnadskonto 5000–7834 | Hele budsjettversjon `2026B` |
+
+Kontoomfanget er avgjørende for samlet visning. Inntekts- og finansposter
+utenfor 5000–7834 skal ikke inngå i driftskostnadene. Innenfor dette
+kontoomfanget tar «Alle finansieringer» også med finansieringskoder som ikke
+har et eget valg i grensesnittet.
 
 ## Periodeberegning
 

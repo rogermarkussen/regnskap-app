@@ -9,6 +9,7 @@
   } from './lib/reportModel.js';
   import {
     createTask2WorkbookSheets,
+    selectTask2ExportRows,
     task2WorkbookFilename
   } from './lib/task2ExcelExport.js';
   import LocalDataGate from '../../../shared/browser/LocalDataGate.svelte';
@@ -79,6 +80,12 @@
     resetDrilldown();
   };
 
+  const setYear = (year) => {
+    selectedYear = year;
+    reportPeriod = 'latest';
+    resetDrilldown();
+  };
+
   const toggleGroup = (key) => {
     expandedGroups = expandedGroups.includes(key)
       ? expandedGroups.filter((candidate) => candidate !== key)
@@ -89,71 +96,30 @@
     expandedGroups = expandedGroups.length === groupKeys.length ? [] : [...groupKeys];
   };
 
-  const rowIdentity = (row) => ({
-    Seksjon: selectedSection.label,
-    Hovedgruppe: row.hovedgruppe,
-    Radtype: row.row_type,
-    'Kontogruppe/konto': displayLabel(row.radtekst),
-    Kontonummer: row.konto,
-    Kontonavn: row.konto_navn,
-    Datastatus: row.data_status
-  });
-
   const downloadExcel = async () => {
     exporting = true;
     try {
-      const exportRows = filterReportRows(hierarchicalRows, {
+      const exportRows = selectTask2ExportRows(hierarchicalRows, {
         mainGroup,
-        level,
-        search,
-        openGroups: expandedGroups
+        search
       });
-      const virksomhetRows = exportRows.map((row) => ({
-        ...rowIdentity(row),
-        [`Budsjett ${periodText}`]: row.virksomhet_budsjett_tusen,
-        Hovedbok: row.hovedbok_tusen,
-        Avvik: row.avvik_tusen,
-        Årsbudsjett: row.aarets_budsjett_tusen,
-        'Forbruk av årsbudsjett': row.forbruk_av_aarets_budsjett,
-        Investeringsbudsjett: row.investeringsbudsjett_tusen,
-        Investeringsregnskap: row.investeringsregnskap_tusen
-      }));
-      const kontantRows = exportRows.map((row) => ({
-        ...rowIdentity(row),
-        Kontantbudsjett: row.kontant_budsjett_tusen,
-        Kontant: row.kontant_tusen,
-        Kontantavvik: row.kontant_avvik_tusen
-      }));
-      const maanedRows = exportRows.map((row) => ({
-        ...rowIdentity(row),
-        ...Object.fromEntries(
-          monthOptions.map(({ month, exportLabel }) => [
-            exportLabel,
-            budgetMonthValue(row, month)
-          ])
-        ),
-        'Totalt alle måneder': row.aarets_budsjett_tusen
-      }));
       const metadata = [
-        { Felt: 'Finansiering', Verdi: selectedReport.label },
-        { Felt: 'Periode', Verdi: periodText },
-        { Felt: 'Seksjon / kostnadssted', Verdi: selectedSection.label },
-        { Felt: 'Budsjettversjon', Verdi: budgetVersion },
-        { Felt: 'Investeringsregel', Verdi: 'Budsjett dim_1=212 · Regnskap dim_4=154345' },
-        { Felt: 'Enhet', Verdi: 'NOK 1 000' },
-        { Felt: 'Hovedgruppefilter', Verdi: mainGroup === 'alle' ? 'Alle hovedgrupper' : mainGroup },
-        { Felt: 'Nivåfilter', Verdi: level },
-        { Felt: 'Søk', Verdi: search || 'Ingen' },
-        { Felt: 'Rader i Virksomhet-fanen', Verdi: virksomhetRows.length },
-        { Felt: 'Rader i Kontant-fanen', Verdi: kontantRows.length },
-        { Felt: 'Rader i Måneder-fanen', Verdi: maanedRows.length },
-        { Felt: 'Kilde', Verdi: hierarchicalRows[0]?.source_file ?? '' }
+        { label: 'Rapportperiode', value: periodText },
+        { label: 'År', value: selectedYear },
+        { label: 'Finansiering', value: selectedReport.label },
+        { label: 'Seksjon / kostnadssted', value: selectedSection.label },
+        { label: 'Budsjettversjon', value: budgetVersion },
+        { label: 'Enhet', value: 'NOK 1 000' },
+        { label: 'Hovedgruppefilter', value: mainGroup === 'alle' ? 'Alle hovedgrupper' : mainGroup },
+        { label: 'Søk', value: search || 'Ingen' },
+        { label: 'Eksportvisning', value: 'Full visning med kontodetaljer' },
+        { label: 'Kilde', value: hierarchicalRows[0]?.source_file ?? '' }
       ];
       const workbookSheets = createTask2WorkbookSheets({
-        virksomhetRows,
-        kontantRows,
-        maanedRows,
-        metadata
+        rows: exportRows,
+        metadata,
+        periodText,
+        monthLabels: monthOptions.map(({ exportLabel }) => exportLabel)
       });
       await writeExcelFile(workbookSheets).toFile(
         task2WorkbookFilename(financing, periodText, sectionCode)
@@ -226,7 +192,8 @@
   };
 
   $: availableYears = [...new Set(rows.map((row) => Number(row.report_year)).filter(Number.isFinite))]
-    .sort((left, right) => right - left);
+    .sort((left, right) => left - right);
+  $: latestAvailableYear = availableYears.at(-1);
   $: availablePeriods = [...new Set(rows
     .filter((row) => Number(row.report_year) === selectedYear)
     .map((row) => String(row.rapportperiode)))]
@@ -236,13 +203,14 @@
     : reportPeriod;
   $: periodOptions = availablePeriods.map((period) => ({
     value: period,
-    label: `Januar–${monthNames[Number(period.slice(4)) - 1]?.[1].toLocaleLowerCase('nb-NO')} ${period.slice(0, 4)}`
+    label: `${monthNames[Number(period.slice(4)) - 1]?.[1]} ${period.slice(0, 4)}`
   })).reverse();
   $: monthOptions = monthNames.map(([shortLabel, exportLabel], index) => ({
     month: index + 1,
     shortLabel,
     exportLabel
   }));
+  $: fullValueColumns = Array.from({ length: 23 });
   $: hierarchicalRows = selectReportRows(rows, {
     financing,
     reportPeriod: effectivePeriod,
@@ -275,7 +243,7 @@
   $: if (dataReady && !loading && !loadError && typeof window !== 'undefined') {
     const params = new URLSearchParams();
     if (financing !== '154301') params.set('finansiering', financing);
-    if (selectedYear !== availableYears[0]) params.set('aar', String(selectedYear));
+    if (selectedYear !== latestAvailableYear) params.set('aar', String(selectedYear));
     if (reportPeriod !== 'latest') params.set('periode', effectivePeriod);
     if (sectionCode !== 'all') params.set('seksjon', sectionCode);
     const query = params.toString();
@@ -306,7 +274,7 @@
       <p>{loadError}. Kontroller at du har valgt den felles mappen med de 12 råfilene.</p>
   </main>
 {:else}
-  <main class="report-shell">
+  <main class="report-shell" class:full-view={view === 'full'}>
     <header class="masthead">
       <div class="masthead-copy">
         <span class="eyebrow">Oppgave 2 · Regnskap</span>
@@ -335,16 +303,24 @@
       <div class="scope-period">
         <span>Rapportperiode</span>
         <div class="period-switch period-selects">
-          <label>
-            <span>År</span>
-            <select bind:value={selectedYear} on:change={() => { reportPeriod = 'latest'; resetDrilldown(); }}>
-              {#each availableYears as year}<option value={year}>{year}</option>{/each}
-            </select>
-          </label>
+          <fieldset class="year-picker">
+            <legend>År</legend>
+            <div class="year-options" aria-label="Velg år">
+              {#each availableYears as year}
+                <button
+                  type="button"
+                  class:active={selectedYear === year}
+                  aria-pressed={selectedYear === year}
+                  aria-label={`Vis ${year}`}
+                  on:click={() => setYear(year)}
+                >{String(year).slice(-2)}</button>
+              {/each}
+            </div>
+          </fieldset>
           <label>
             <span>Til og med</span>
             <select bind:value={reportPeriod} on:change={resetDrilldown}>
-              <option value="latest">Nyeste tilgjengelige måned</option>
+              <option value="latest">Siste tilgjengelige · {periodOptions[0]?.label?.toLocaleLowerCase('nb-NO')}</option>
               {#each periodOptions as option}<option value={option.value}>{option.label}</option>{/each}
             </select>
           </label>
@@ -457,7 +433,7 @@
         <div class="segmented" aria-label="Velg tallvisning">
           <button type="button" class:active={view === 'virksomhet'} aria-pressed={view === 'virksomhet'} on:click={() => (view = 'virksomhet')}>Virksomhet</button>
           <button type="button" class:active={view === 'kontant'} aria-pressed={view === 'kontant'} on:click={() => (view = 'kontant')}>Kontant</button>
-          <button type="button" class:active={view === 'maaned'} aria-pressed={view === 'maaned'} on:click={() => (view = 'maaned')}>Måneder</button>
+          <button type="button" class:active={view === 'full'} aria-pressed={view === 'full'} on:click={() => (view = 'full')}>Full visning</button>
         </div>
       </div>
 
@@ -470,31 +446,52 @@
         {/if}
       </div>
 
-      {#if view === 'virksomhet' && budgetIsIncomplete}
+      {#if ['virksomhet', 'full'].includes(view) && budgetIsIncomplete}
         <p class="source-warning">Budsjett {budgetVersion} mangler poster for {incompleteBudgetAccounts.length} kontoer som har hovedbokstall. Budsjett, avvik og forbruk vises som tomme verdier der sammenligningsgrunnlaget mangler.</p>
       {/if}
 
-      {#if view === 'kontant' && sectionCode !== 'all'}
+      {#if ['kontant', 'full'].includes(view) && sectionCode !== 'all'}
         <p class="source-warning">Kontantkilden har ikke en pålitelig seksjonsfordeling. Kontantverdier vises derfor ikke når en seksjon er valgt.</p>
-      {:else if view === 'kontant' && (total.kontant_tusen === null || total.kontant_tusen === undefined)}
+      {:else if ['kontant', 'full'].includes(view) && (total.kontant_tusen === null || total.kontant_tusen === undefined)}
         <p class="source-warning">Kontantdata finnes ikke for {selectedReport.label}, periode {periodText}. Rapporten bruker ikke null som erstatning for en manglende kilde.</p>
-      {:else if view === 'maaned'}
-        <p class="source-note">Månedsbudsjettet viser januar til desember. Rapportperioden brukes bare for akkumulerte budsjett- og hovedbokstall.</p>
+      {/if}
+      {#if view === 'full'}
+        <p class="source-note">Månedsbudsjettet viser januar til desember. Rapportperioden styrer de akkumulerte kolonnene for virksomhets- og kontantregnskap.</p>
       {/if}
 
       <div class="table-scroll detail-scroll">
-        <table class="detail-table">
+        <table class="detail-table" class:full-table={view === 'full'}>
+          {#if view === 'full'}
+            <colgroup>
+              <col class="full-label-column" />
+              <col class="full-type-column" />
+              {#each fullValueColumns as _}<col class="full-value-column" />{/each}
+            </colgroup>
+          {/if}
           <thead>
-            <tr>
-              <th class="sticky-col">Kontogruppe / konto</th><th>Type</th>
-              {#if view === 'virksomhet'}
-                <th>Budsjett {periodText}</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th><th>Investeringsbudsjett</th><th>Investeringsregnskap</th>
-              {:else if view === 'kontant'}
-                <th>Kontantbudsjett</th><th>Kontant</th><th>Avvik</th>
-              {:else}
-                {#each monthOptions as month}<th>{month.shortLabel}</th>{/each}<th class="month-total">Totalt alle måneder</th>
-              {/if}
-            </tr>
+            {#if view === 'full'}
+              <tr class="column-groups">
+                <th class="sticky-col" rowspan="2">Kontogruppe / konto</th>
+                <th rowspan="2">Type</th>
+                <th colspan="7">Virksomhetsregnskap</th>
+                <th colspan="13">Månedsbudsjett</th>
+                <th colspan="3">Kontantregnskap</th>
+              </tr>
+              <tr class="column-labels">
+                <th>Budsjett</th><th><abbr title="Hovedbok">H.bok</abbr></th><th>Avvik</th><th><abbr title="Årsbudsjett">Årsbud.</abbr></th><th>Forbruk</th><th><abbr title="Investeringsbudsjett">Inv.bud.</abbr></th><th><abbr title="Investeringsregnskap">Inv.regn.</abbr></th>
+                {#each monthOptions as month}<th>{month.shortLabel}</th>{/each}<th class="month-total">Årstotal</th>
+                <th>Budsjett</th><th>Kontant</th><th>Avvik</th>
+              </tr>
+            {:else}
+              <tr>
+                <th class="sticky-col">Kontogruppe / konto</th><th>Type</th>
+                {#if view === 'virksomhet'}
+                  <th>Budsjett {periodText}</th><th>Hovedbok</th><th>Avvik</th><th>Årsbudsjett</th><th>Forbruk</th><th>Investeringsbudsjett</th><th>Investeringsregnskap</th>
+                {:else if view === 'kontant'}
+                  <th>Kontantbudsjett</th><th>Kontant</th><th>Avvik</th>
+                {/if}
+              </tr>
+            {/if}
           </thead>
           <tbody>
             {#each filteredRows as row}
@@ -514,15 +511,21 @@
                   <td>{number(row.virksomhet_budsjett_tusen)}</td><td>{number(row.hovedbok_tusen)}</td><td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td>{number(row.aarets_budsjett_tusen)}</td><td>{percent(row.forbruk_av_aarets_budsjett)}</td><td>{number(row.investeringsbudsjett_tusen)}</td><td>{number(row.investeringsregnskap_tusen)}</td>
                 {:else if view === 'kontant'}
                   <td>{number(row.kontant_budsjett_tusen)}</td><td>{number(row.kontant_tusen)}</td><td class:bad={Number(row.kontant_avvik_tusen) < 0}>{number(row.kontant_avvik_tusen)}</td>
-                {:else}
+                {:else if view === 'full'}
+                  <td>{number(row.virksomhet_budsjett_tusen)}</td><td>{number(row.hovedbok_tusen)}</td><td class:bad={Number(row.avvik_tusen) < 0}>{number(row.avvik_tusen)}</td><td>{number(row.aarets_budsjett_tusen)}</td><td>{percent(row.forbruk_av_aarets_budsjett)}</td><td>{number(row.investeringsbudsjett_tusen)}</td><td>{number(row.investeringsregnskap_tusen)}</td>
                   {#each monthOptions as month}<td>{number(budgetMonthValue(row, month.month))}</td>{/each}<td class="month-total">{number(row.aarets_budsjett_tusen)}</td>
+                  <td>{number(row.kontant_budsjett_tusen)}</td><td>{number(row.kontant_tusen)}</td><td class:bad={Number(row.kontant_avvik_tusen) < 0}>{number(row.kontant_avvik_tusen)}</td>
                 {/if}
               </tr>
             {/each}
           </tbody>
         </table>
       </div>
-      <p class="scroll-hint">Tabellen kan rulles sideveis. Den første kolonnen blir stående.</p>
+      {#if view === 'full'}
+        <p class="scroll-hint">Full visning bruker hele sidebredden og viser alle kolonnene samlet.</p>
+      {:else}
+        <p class="scroll-hint">Tabellen kan rulles sideveis. Den første kolonnen blir stående.</p>
+      {/if}
     </section>
 
     <footer class="report-footer">

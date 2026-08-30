@@ -218,7 +218,7 @@ class Task2ReportPeriodTest(unittest.TestCase):
                 from read_parquet('{BUDGET_HEADER_PATH.as_posix()}') h
                 join read_parquet('{BUDGET_VALUE_PATH.as_posix()}') v using (trans_id)
                 where h.version = '2026B'
-                  and trim(h.account) = '3710'
+                  and trim(h.account) = '5080'
                   and try_cast(v.period as integer) between 202601 and 202612
                 """
             ).fetchone()[0]
@@ -233,7 +233,7 @@ class Task2ReportPeriodTest(unittest.TestCase):
                   and finansiering = 'alle'
                   and rapportperiode = '202608'
                   and row_type = 'account'
-                  and konto = '3710'
+                  and konto = '5080'
                 """
             ).fetchone()
         finally:
