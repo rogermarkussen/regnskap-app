@@ -261,7 +261,7 @@ def render() -> str:
       <div class="ok" id="conclusion"></div>
       <p><b>Excel-fasit:</b> <span class="source" id="fasit"></span></p>
       <p><b>Beregnet rapport:</b> <span class="source">ekstern generert mappe, oppgave2/static-app/grouped_finance_rows.parquet</span></p>
-      <p><b>Operative hovedkilder:</b> <span class="source">data/agltransact.parquet + data/apltransact.parquet + data/apltransactvalue.parquet (2026B)</span></p>
+      <p><b>Operative hovedkilder:</b> <span class="source">data/agltransact.parquet + data/apltransact.parquet + data/apltransactvalue.parquet (2026RV)</span></p>
       <div class="warning">Kontantkolonnene sammenlignes mot Excel og formelkontrolleres, men er ikke uavhengig avstemt fordi en separat operativ Parquet-kilde for kontant ennå mangler.</div>
     </div>
   </section>

@@ -13,7 +13,7 @@ Rapporten skal derfor fortsatt merkes «Kontrollert utkast».
 De viktigste avklaringene er:
 
 1. velg én fortegnsregel for avvik i hele løsningen;
-2. godkjenn budsjettfordelingen fra seksjon til finansiering;
+2. avklar budsjettposter uten finansieringskode hos kilden;
 3. bekreft kontantgrunnlaget for seksjon `712`;
 4. erstatt eller merk faste kontrolltall fra Excel-malen;
 5. definer prosjektmapping for tilleggsforslag, overligger og nye
@@ -27,7 +27,7 @@ De viktigste avklaringene er:
 | --- | --- | --- | --- |
 | Regnskapskilde | `data-ny/2026/agltransact.parquet` | Operativt snapshot | Teknisk etablert |
 | Budsjettkilde | `data/apltransact.parquet` koblet med `data/apltransactvalue.parquet` | Lokalt snapshot | Teknisk etablert |
-| Budsjettversjon | Bare `2026B` | Prosjektets tidligere reproduksjon mot Excel | Må godkjennes for månedsavslutning |
+| Budsjettversjon | `2026RV` for 2026; opprinnelig budsjett for øvrige år | Brukerens beslutning 07.09.2026 | Innført |
 | Seksjoner i web | Alle reelle seksjoner med hovedbok- eller budsjettdata; `999` utelates | Operative kilder | Teknisk etablert |
 | Seksjoner i Excel-mal | `711`, `712`, `721`, `731`, `741` | Mottatt Excel-mal | Må bekreftes som komplett Excel-omfang |
 | Avsluttet periode | Siste periode med lønnsposteringer og transaksjonsdato til månedsslutt | Teknisk regel i `monthly_close_data.py` | Må godkjennes som periodelås |
@@ -39,7 +39,7 @@ De viktigste avklaringene er:
 | Forrige måned | Perioden umiddelbart før valgt periode | Teknisk beregning | Etablert |
 | Hittil i år | Januar til og med valgt periode | Teknisk beregning | Etablert |
 | Faktisk finansiering | `154322` og `045101` slås sammen; tom `dim_4` vises som `Uten finansiering`; øvrige beholder `dim_4` | Utledet rapportregel og Excel-fasit | Teknisk avstemt |
-| Budsjettfinansiering | `dim_1=212` → `154345`; `dim_1=761` → `154322+045101`; resten → `154301` | Utledet regel fra tidligere Excel-reproduksjon | Ikke faglig godkjent |
+| Budsjettfinansiering | Faktisk `dim_4`; `154322` og `045101` slås sammen; tom kode beholdes som `Uten finansiering` | Operativt budsjettuttrekk | Innført etter brukerens beslutning 07.09.2026 |
 | Avvik i oppgave 3 | Budsjett minus hovedbok | Samme regel som oppgave 2 og Excel-fasit | Teknisk avstemt |
 | Manglende postering | `0` når kilden finnes, men kombinasjonen ikke har postering | Teknisk presentasjonsregel | Fornuftig, bør godkjennes |
 | Manglende kilde/regel | `–` med forklaring | Teknisk presentasjonsregel | Fornuftig, bør godkjennes |
@@ -59,18 +59,10 @@ eksplisitt lukket-periode-markør når den blir tilgjengelig.
 
 ### Budsjett og finansiering
 
-Budsjetthodet har feltene `dim_1`, `dim_2`, konto og versjon, men ikke `dim_4`.
-Finansiering finnes derfor ikke direkte i mottatt budsjettkilde. Dagens mapping
-er utledet fra tidligere Excel-tall:
-
-| Utledet finansiering | Budsjettseksjon | Årsbudsjett 2026B |
-| --- | --- | ---: |
-| `154301` | Alle `dim_1` unntatt `212` og `761` | 325 087 211,07 |
-| `154322+045101` | `dim_1=761` | 115 046 999,98 |
-| `154345` | `dim_1=212` | 27 699 999,96 |
-
-Beløpene dokumenterer hva regelen produserer; de beviser ikke at mappingen er
-en varig forretningsregel.
+Budsjettuttrekket fra 7. september 2026 inneholder `dim_4` og `att_4_id = R00`
+for både 2026B og 2026RV. Finansiering leses direkte fra `dim_4`. Den tidligere
+fordelingen fra seksjon er fjernet. Tom kode beholdes som `Uten finansiering`.
+Se rotens `DATA.md` for opplastingssnapshot, datamanifest og kontroller.
 
 ### Fortegn og avvik
 

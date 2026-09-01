@@ -19,6 +19,9 @@ try:
 except ImportError:
     from project_data import task1_sources
 
+from shared.financing import report_financing
+from shared.budget_version import budget_version_for_year, budget_version_sql
+
 
 @dataclass(frozen=True)
 class MetricRule:
@@ -41,7 +44,7 @@ class SectionScope:
     sort_order: int
 
 
-BUSINESS_RULE_VERSION = "2026-08-06"
+BUSINESS_RULE_VERSION = "2026-09-07"
 
 MONTH_NAMES = (
     "Januar",
@@ -135,7 +138,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               ) as ugyldige_belop
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = substr(trim(v.period), 1, 4) || 'B'
+            where h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
               and regexp_matches(trim(v.period), '^[0-9]{{6}}$')
               and try_cast(substr(trim(v.period), 5, 2) as integer) between 1 and 12
             """
@@ -144,7 +147,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
             f"""
             select string_agg(version || ' · ' || description, '; ' order by version)
             from read_parquet('{budget_versions_path.as_posix()}')
-            where regexp_matches(version, '^20[0-9]{{2}}B$')
+            where version = {budget_version_sql("substr(version, 1, 4)")}
             """
         ).fetchone()[0]
     finally:
@@ -174,7 +177,7 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
                 "hovedbok_siste_transaksjonsdato": actual[2],
                 "hovedbok_rader": actual[3],
                 "budsjett_kilde": f"{budget_header_path.name} + {budget_value_path.name}",
-                "budsjettversjon": budget_versions or "Opprinnelig budsjett per år",
+                "budsjettversjon": budget_versions or "2026RV for 2026, opprinnelig budsjett for øvrige år",
                 "budsjett_periode_fra": budget[0],
                 "budsjett_periode_til": budget[1],
                 "budsjett_rader": budget[2],
@@ -233,14 +236,8 @@ METRIC_RULES = (
 )
 
 
-def _budget_financing(dim_1: object) -> str:
-    """Godkjent budsjettmapping, regelversjon 2026-08-06."""
-    value = str(dim_1).strip()
-    if value == "212":
-        return "154345"
-    if value == "761":
-        return "154322+045101"
-    return "154301"
+def _budget_financing(dim_4: object) -> str:
+    return report_financing(None if pd.isna(dim_4) else dim_4)
 
 
 def _read_sources(
@@ -275,6 +272,7 @@ def _read_sources(
               cast(h.account as varchar) as account,
               cast(h.dim_1 as varchar) as dim_1,
               cast(h.dim_2 as varchar) as dim_2,
+              cast(h.dim_4 as varchar) as dim_4,
               case
                 when h.dim_1 is null or trim(cast(h.dim_1 as varchar)) = '' then '__missing__'
                 else trim(cast(h.dim_1 as varchar))
@@ -284,7 +282,7 @@ def _read_sources(
               {budget_amount} / 1000.0 as amount_tusen
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = substr(trim(cast(v.period as varchar)), 1, 4) || 'B'
+            where h.version = {budget_version_sql("substr(trim(cast(v.period as varchar)), 1, 4)")}
               and regexp_matches(trim(cast(v.period as varchar)), '^[0-9]{{6}}$')
               and try_cast(substr(trim(cast(v.period as varchar)), 5, 2) as integer)
                   between 1 and 12
@@ -295,7 +293,7 @@ def _read_sources(
 
     actual["account_number"] = pd.to_numeric(actual["account"], errors="coerce")
     budget["account_number"] = pd.to_numeric(budget["account"], errors="coerce")
-    budget["financing"] = budget["dim_1"].map(_budget_financing)
+    budget["financing"] = budget["dim_4"].map(_budget_financing)
     return actual, budget
 
 
@@ -383,7 +381,7 @@ def _budget_scope(
 ) -> pd.DataFrame:
     year = end_period[:4]
     scoped = frame[frame["period"].between(f"{year}01", end_period)]
-    scoped = scoped[scoped["budget_version"] == f"{year}B"]
+    scoped = scoped[scoped["budget_version"] == budget_version_for_year(year)]
     scoped = scoped[scoped["financing"] == rule.financing]
     if section_code != "all":
         scoped = scoped[scoped["section_code"] == section_code]
@@ -451,7 +449,7 @@ def build_dashboard_kpi_frame(
                 "period_label": f"{MONTH_NAMES[period_month - 1]} {period_year}",
                 "period_sort": int(end_period),
                 "is_latest_period": end_period == latest_period,
-                "budsjettversjon": f"{period_year}B",
+                "budsjettversjon": budget_version_for_year(period_year),
             }
             for rule in METRIC_RULES:
                 actual_scope = _actual_scope(actual, rule, end_period, section.code)
@@ -559,7 +557,7 @@ def build_dashboard_kpi_frame(
     result["kilde_hovedbok"] = actual_source.name
     result["kilde_budsjett"] = (
         f"{budget_header_source.name} + {budget_value_source.name}, "
-        "opprinnelig budsjett for valgt år"
+        "2026RV for 2026, opprinnelig budsjett for øvrige år"
     )
     result["regelversjon"] = BUSINESS_RULE_VERSION
     return result

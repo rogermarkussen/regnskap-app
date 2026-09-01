@@ -147,8 +147,8 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
                     ),
                     "grunnlag_json": json.dumps(details, ensure_ascii=False),
                     "beregningsregel": CALCULATION_RULES[(financing, title)],
-                    "regelversjon": "2026-08-06",
-                    "budsjettversjon": "2026B",
+                    "regelversjon": "2026-09-07",
+                    "budsjettversjon": "2026RV",
                 })
                 continue
 
@@ -182,8 +182,8 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
                     ensure_ascii=False,
                 ),
                 "beregningsregel": CALCULATION_RULES[(financing, title)],
-                "regelversjon": "2026-08-06",
-                "budsjettversjon": "2026B",
+                "regelversjon": "2026-09-07",
+                "budsjettversjon": "2026RV",
             })
     return rows
 
@@ -227,24 +227,25 @@ def write_operational_parquet() -> None:
     pd.DataFrame(actual_rows).to_parquet(output / "agltransact.parquet", index=False, compression="zstd")
 
     budget_specs = [
-        ("711", "6110", "", 120_000),
-        ("711", "6700", "", 40_000),
-        ("711", "7100", "", 20_000),
-        ("711", "5050", "", 12_000),
-        ("212", "6110", "", 80_000),
-        ("761", "6110", "", 90_000),
-        ("761", "6200", "7114", 30_000),
+        ("711", "154301", "6110", "", 120_000),
+        ("711", "154301", "6700", "", 40_000),
+        ("711", "154301", "7100", "", 20_000),
+        ("711", "154301", "5050", "", 12_000),
+        ("212", "154345", "6110", "", 80_000),
+        ("761", "154322", "6110", "", 90_000),
+        ("761", "154322", "6200", "7114", 30_000),
     ]
     headers = []
     values = []
-    for index, (dim_1, account, project, amount) in enumerate(budget_specs, start=1):
+    for index, (dim_1, dim_4, account, project, amount) in enumerate(budget_specs, start=1):
         trans_id = f"TEST-{index:03d}"
         headers.append({
             "trans_id": trans_id,
             "account": account,
             "dim_1": dim_1,
             "dim_2": project,
-            "version": "2026B",
+            "dim_4": dim_4,
+            "version": "2026RV",
         })
         values.extend(
             {"trans_id": trans_id, "period": period, "amount": amount}

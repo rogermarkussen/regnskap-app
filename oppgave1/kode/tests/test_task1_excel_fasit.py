@@ -206,9 +206,11 @@ class Task1ExcelFasitTest(unittest.TestCase):
         self.assertTrue(
             (self.calculated["budsjettversjon"] == expected_versions).all()
         )
-        self.assertEqual(_budget_financing("212"), "154345")
-        self.assertEqual(_budget_financing("761"), "154322+045101")
-        self.assertEqual(_budget_financing("711"), "154301")
+        self.assertEqual(_budget_financing("154345"), "154345")
+        self.assertEqual(_budget_financing("154322"), "154322+045101")
+        self.assertEqual(_budget_financing("045101"), "154322+045101")
+        self.assertEqual(_budget_financing("150021"), "150021")
+        self.assertEqual(_budget_financing(None), "Uten finansiering")
 
         ratio = self.calculated[
             (self.calculated["section_code"] == "all")

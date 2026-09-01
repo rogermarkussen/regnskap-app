@@ -1,4 +1,5 @@
 <script>
+  import { budgetVersionForYear } from '../../../shared/budgetVersion.js';
   import writeExcelFile from 'write-excel-file/browser';
   import {
     budgetMonthValue,
@@ -21,12 +22,13 @@
 
   const requiredLocalFiles = COMMON_DATA_FILES;
 
-  const reportOptions = [
+  const defaultReportOptions = [
     { value: '154301', label: '154301' },
     { value: '154345', label: '154345' },
     { value: '154322+045101', label: '154322 + 045101' },
     { value: 'alle', label: 'Alle finansieringer' }
   ];
+  let reportOptions = defaultReportOptions;
   const monthNames = [
     ['Jan', 'Januar'], ['Feb', 'Februar'], ['Mar', 'Mars'], ['Apr', 'April'],
     ['Mai', 'Mai'], ['Jun', 'Juni'], ['Jul', 'Juli'], ['Aug', 'August'],
@@ -162,6 +164,12 @@
           section_sort: Number(row.section_sort)
         };
       });
+      const knownFinancings = new Set(defaultReportOptions.map((option) => option.value));
+      const extraFinancings = [...new Set(rows.map((row) => row.finansiering))]
+        .filter((code) => !knownFinancings.has(code))
+        .sort((left, right) => left.localeCompare(right, 'nb-NO'))
+        .map((code) => ({ value: code, label: code }));
+      reportOptions = [...defaultReportOptions.slice(0, -1), ...extraFinancings, defaultReportOptions.at(-1)];
       dataFolderName = selection.folderName;
       dataReady = true;
       sections = [...new Map(
@@ -174,7 +182,7 @@
       ).values()].sort((left, right) => Number(left.sort) - Number(right.sort));
 
       const dataYears = rows.map((row) => Number(row.report_year)).filter(Number.isFinite);
-      if (dataYears.length) selectedYear = Math.max(...dataYears);
+      if (dataYears.length) selectedYear = dataYears.reduce((latest, year) => Math.max(latest, year), dataYears[0]);
 
       const params = new URLSearchParams(window.location.search);
       financing = validParam(params.get('finansiering'), reportOptions, financing);
@@ -217,7 +225,7 @@
     sectionCode
   });
   $: budgetVersion = String(
-    hierarchicalRows[0]?.budsjettversjon ?? `${selectedYear}B`
+    hierarchicalRows[0]?.budsjettversjon ?? budgetVersionForYear(selectedYear)
   );
   $: incompleteBudgetAccounts = hierarchicalRows.filter(
     (row) =>
@@ -261,7 +269,14 @@
   <title>{selectedSection.label} | Kontogruppering</title>
 </svelte:head>
 
-{#if !dataReady && !loading}
+{#if loadError && !loading}
+  <main class="state-shell error-state" role="alert">
+    <span class="state-code">Datakilde</span>
+    <h1>Rapporten kan ikke åpnes</h1>
+    <p>{loadError}. Kontroller at du har valgt den felles mappen med de 12 råfilene.</p>
+    <button type="button" on:click={() => { loadError = ''; }}>Velg en annen datamappe</button>
+  </main>
+{:else if !dataReady && !loading}
   <LocalDataGate
     taskLabel="Oppgave 2 · Kontogruppering"
     requiredFiles={requiredLocalFiles}
@@ -272,12 +287,6 @@
     <div class="loader" aria-hidden="true"></div>
     <h1>Bygger rapporten</h1>
     <p>Leser kontogrupper og operative tall.</p>
-  </main>
-{:else if loadError}
-  <main class="state-shell error-state" role="alert">
-    <span class="state-code">Datakilde</span>
-    <h1>Rapporten kan ikke åpnes</h1>
-      <p>{loadError}. Kontroller at du har valgt den felles mappen med de 12 råfilene.</p>
   </main>
 {:else}
   <main class="report-shell" class:full-view={view === 'full'}>

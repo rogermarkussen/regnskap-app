@@ -1,4 +1,6 @@
 import { openLocalDuckDb } from './localDuckDb.js';
+import { budgetVersionSql } from '../../shared/budgetVersion.js';
+import { financingSql, requireBudgetFinancing } from '../../shared/financing.js';
 
 const SOURCE_FILES = [
   'agltransact.parquet', 'apltransact.parquet', 'apltransactvalue.parquet',
@@ -21,8 +23,7 @@ with closed_periods as (
   ) where lonnsrader > 0 and siste_dato >= last_day(strptime(periode || '01', '%Y%m%d'))
 ), actual_base as (
   select trim(dim_1) as seksjon,
-    case when trim(dim_4) in ('154322', '045101') then '154322+045101'
-      else coalesce(nullif(trim(dim_4), ''), 'Uten finansiering') end as finansiering,
+    ${financingSql('a.dim_4')} as finansiering,
     ${category('a')} as kategori, trim(period) as period,
     sum(try_cast(amount as double)) as hovedbok_nok, 0::double as budsjett_nok
   from read_parquet('agltransact.parquet') a
@@ -30,14 +31,13 @@ with closed_periods as (
   group by 1, 2, 3, 4 having kategori is not null
 ), budget_base as (
   select trim(h.dim_1) as seksjon,
-    case when trim(h.dim_1) = '212' then '154345'
-      when trim(h.dim_1) = '761' then '154322+045101' else '154301' end as finansiering,
+    ${financingSql('h.dim_4')} as finansiering,
     ${category('h')} as kategori, trim(v.period) as period,
     0::double as hovedbok_nok,
     sum(coalesce(try_cast(v.amount as double), try_cast(v.amount1 as double))) as budsjett_nok
   from read_parquet('apltransact.parquet') h
   join read_parquet('apltransactvalue.parquet') v using (trans_id)
-  where h.version = substr(trim(v.period), 1, 4) || 'B'
+  where h.version = ${budgetVersionSql("substr(trim(v.period), 1, 4)")}
     and regexp_matches(trim(v.period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
   group by 1, 2, 3, 4 having kategori is not null
 ), monthly as (
@@ -101,7 +101,7 @@ select *, budsjett_maaned_nok - hovedbok_maaned_nok as avvik_maaned_nok,
   budsjett_forrige_nok - hovedbok_forrige_nok as avvik_forrige_nok,
   budsjett_hittil_nok - hovedbok_hittil_nok as avvik_hittil_nok,
   lpad(cast(try_cast(periode as integer) - 1 as varchar), 6, '0') as forrige_periode,
-  substr(periode, 1, 4) || 'B' as budsjettversjon,
+  ${budgetVersionSql("substr(periode, 1, 4)")} as budsjettversjon,
   'Beregnet lokalt fra operative Parquet-filer' as kildestatus
 from report order by periode, omfang, omfang_id, finansiering, sortering
 `;
@@ -220,6 +220,7 @@ order by fakturanr, oid, hendelse_tid, try_cast(task_id as integer)
 export const loadTask3Data = async (files) => {
   const db = await openLocalDuckDb(files, SOURCE_FILES);
   try {
+    await requireBudgetFinancing(db);
     const [summary, invoices, sourceRows] = await Promise.all([
       db.query(SUMMARY_SQL), db.query(MONTHLY_INVOICES_SQL),
       db.query(`select max(coalesce(try_cast(action_date as timestamp), try_cast(ready_date as timestamp), try_cast(distr_date as timestamp))) as seneste_workflowhendelse, (select max(try_cast(voucher_date as date)) from read_parquet('agltransact.parquet')) as seneste_bilagsdato, (select max(trim(period)) from read_parquet('agltransact.parquet')) as seneste_hovedboksperiode from read_parquet('awftaskfin.parquet')`)

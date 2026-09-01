@@ -126,6 +126,90 @@
       "role": "fasit",
       "classification": "confidential",
       "sha256": "4ba68c95f08d1621d1bc1ff661e348cf1a9395f8933e6e7540a94429a56e088e"
+    },
+    "upload.a47en53invoicequeuehistr": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/a47en53invoicequeuehistr.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "restricted",
+      "sha256": "63a95114378def4a019c5effb95651baba835214ff9c0088533d4fc146813552"
+    },
+    "upload.acaaccounts": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/acaaccounts.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "4542aebf20d97f40f252415d0015eaba604839f904ae938e36db15c0832ca574"
+    },
+    "upload.acatrans": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/acatrans.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "3257c12dac0ddd2e0a29df82d97891235afa8af0a0977b1103a0d1321cf6880a"
+    },
+    "upload.acrtrans": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/acrtrans.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "78f7475480d5253eea1717cca2f31d6941e10c3a68e9977868cf30f79757e7c3"
+    },
+    "upload.agldimvalue": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/agldimvalue.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "72625892f07be259cd59d4e1858a55f9731fe6833aa99699c73d0a39ca6ee1fb"
+    },
+    "upload.agltransact": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/agltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "7917ae19b99524af2c1d92cbd1fef8e2b220b1e713c27edd980c97bba5a75dd4"
+    },
+    "upload.agltransactmap": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/agltransactmap.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "0f95bd8547019f04c9461337991a7164883b05a07bd42c221267608022741955"
+    },
+    "upload.apltransact": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/apltransact.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "dcec443d477a8c07e3ca32c5f3e8e8f669597db871bf034bfbb2edf55d48edf9"
+    },
+    "upload.apltransactvalue": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/apltransactvalue.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "confidential",
+      "sha256": "ad6c4955b8b17d0fa1eb21776f7626bd16eb20cfb5c76c93bd8b36248e6fdb3a"
+    },
+    "upload.aplversion": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/aplversion.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "830789affbe4fe735eaad85c32192a2206adf83b4dc84eac071c41c8207cd6c9"
+    },
+    "upload.awftaskfin": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/awftaskfin.parquet",
+      "format": "parquet",
+      "role": "operative",
+      "classification": "restricted",
+      "sha256": "2bef56eec72bfa374ee651987aa30efe5551e62d0b1d79c301b3f9c699fb0a7d"
+    },
+    "upload.nkom_kontoplan": {
+      "path": "snapshots/2026-09-07-lokaldata-dim4/operative/nkom_kontoplan.parquet",
+      "format": "parquet",
+      "role": "reference",
+      "classification": "internal",
+      "sha256": "0a1e9938aa8bdff3da1adad019303061a38f644d12b80d45e46569f3fc7b1244"
     }
   },
   "test_datasets": {
@@ -227,5 +311,6 @@
       "classification": "restricted",
       "sha256": "76d60d4b4a7cf6cefd26cc30f2b2663226d59c4dcc194336935648a1c04417b5"
     }
-  }
+  },
+  "upload_snapshot_id": "2026-09-07-lokaldata-dim4"
 }

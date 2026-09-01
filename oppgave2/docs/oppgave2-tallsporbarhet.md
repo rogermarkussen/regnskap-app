@@ -1,5 +1,10 @@
 # Oppgave 2 – tallsporbarhet og Excel-test
 
+> Oppdatert 07.09.2026: Appene bruker `2026RV` og finansiering fra `dim_4` for
+> rapportåret 2026. Eldre avstemminger mot `2026B` nedenfor er historiske.
+> De nye opplastingstestene avstemmer direkte mot RV i `data/lokaldata`;
+> forventningsverdiene i gamle Excel-fasitfiler er ikke endret.
+
 > Fysiske data- og fasitfiler ligger nå under den eksterne dataroten. Tabellen
 > nedenfor beskriver innholdet, mens `data-manifest.json` er autoritativ for
 > faktisk sti, klassifisering og kontrollsum.

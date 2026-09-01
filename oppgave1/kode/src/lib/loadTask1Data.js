@@ -29,7 +29,7 @@ export const loadTask1Data = async (selection) => {
     readRows(files['agldimvalue.parquet'])
   ]);
   requireColumns(actualRows, ['dim_1', 'dim_2', 'dim_4', 'account', 'period', 'amount'], 'agltransact.parquet');
-  requireColumns(budgetHeaderRows, ['trans_id', 'version', 'dim_1', 'account'], 'apltransact.parquet');
+  requireColumns(budgetHeaderRows, ['trans_id', 'version', 'dim_1', 'dim_4', 'account'], 'apltransact.parquet');
   requireColumns(budgetValueRows, ['trans_id', 'period', 'amount'], 'apltransactvalue.parquet');
   const rows = buildSectionDashboardRowsFromSources({
     actualRows,

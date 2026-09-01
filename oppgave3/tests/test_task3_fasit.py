@@ -150,7 +150,7 @@ class Task3FasitTest(unittest.TestCase):
         finally:
             workbook.close()
         self.assertEqual(set(self.calculated["periode"]), {FASIT_PERIOD})
-        self.assertEqual(set(self.calculated["budsjettversjon"]), {"2026B"})
+        self.assertEqual(set(self.calculated["budsjettversjon"]), {"2026RV"})
 
     def test_154301_lonns_hovedbok_og_budsjett(self) -> None:
         calculated = _single_row(

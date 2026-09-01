@@ -115,7 +115,7 @@
   <title>{view === 'close' ? 'Månedsavslutning' : 'Fakturaflyt'} | Oppgave 3</title>
 </svelte:head>
 
-{#if !dataReady && !baseLoading}
+{#if !dataReady && !baseLoading && !error}
   <LocalDataGate
     taskLabel="Oppgave 3 · Regnskapskontroll"
     requiredFiles={requiredLocalFiles}

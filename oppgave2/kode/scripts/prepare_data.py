@@ -16,6 +16,8 @@ except ImportError:
     from project_data import task2_sources
     from parquet_report import INVESTMENT_ACCOUNTS, ParquetReportSources, build_parquet_report
 
+from shared.financing import financing_sql
+
 
 CODE_ROOT = Path(__file__).resolve().parents[1]
 ROOT = CODE_ROOT.parent
@@ -30,7 +32,7 @@ BUDGET_HEADER_PARQUET = SOURCES.budget_header
 BUDGET_VALUE_PARQUET = SOURCES.budget_values
 DIMENSION_VALUES_PARQUET = SOURCES.dimension_values
 LEDGER_PARQUET = SOURCES.ledger
-BUDGET_VERSION = "2026B"
+BUDGET_VERSION = "2026RV"
 
 
 @dataclass(frozen=True)
@@ -354,12 +356,11 @@ def _cash_values_for_account(
 
 def synapse_budget_by_account(
     *,
-    dim_1: str | None = None,
+    financing: str | None = None,
     dim_2: str | None = None,
-    exclude_dim_1: tuple[str, ...] = (),
     section_code: str | None = None,
 ) -> dict[str, dict[str, float]]:
-    """Returner operativt 2026B-budsjett per konto og måned for ett rapportvalg."""
+    """Returner operativt 2026RV-budsjett per konto og måned for ett rapportvalg."""
     missing = [
         path.name
         for path in (BUDGET_HEADER_PARQUET, BUDGET_VALUE_PARQUET)
@@ -372,16 +373,12 @@ def synapse_budget_by_account(
     try:
         filters = ["h.version = ?", "try_cast(v.period as integer) between 202601 and 202612"]
         parameters: list[object] = [BUDGET_VERSION]
-        if dim_1 is not None:
-            filters.append("trim(h.dim_1) = ?")
-            parameters.append(dim_1)
+        if financing is not None:
+            filters.append(f"({financing_sql('h.dim_4')}) = ?")
+            parameters.append(financing)
         if dim_2 is not None:
             filters.append("trim(h.dim_2) = ?")
             parameters.append(dim_2)
-        if exclude_dim_1:
-            placeholders = ", ".join("?" for _ in exclude_dim_1)
-            filters.append(f"(h.dim_1 is null or trim(h.dim_1) not in ({placeholders}))")
-            parameters.extend(exclude_dim_1)
         if section_code is not None:
             filters.append("trim(h.dim_1) = ?")
             parameters.append(section_code)
@@ -460,7 +457,7 @@ def calculated_account_values(section_code: str | None = None) -> dict[
         snapshot_actuals = raw_actuals_frame()
     all_financing_budget = synapse_budget_by_account(section_code=section_code)
     mapped_154301_budget = synapse_budget_by_account(
-        exclude_dim_1=("212", "761"), section_code=section_code
+        financing="154301", section_code=section_code
     )
     source_months = [f"periode_{period}_tusen" for period in range(202601, 202613)]
     result: dict[tuple[str, str], dict[str, dict[str, float | None]]] = {}
@@ -478,7 +475,7 @@ def calculated_account_values(section_code: str | None = None) -> dict[
             "cash_financing": ["154345"],
             "cash_period": "p1_4",
             "parquet_budget": synapse_budget_by_account(
-                dim_1="212", section_code=section_code
+                financing="154345", section_code=section_code
             ),
             "actual_financings": ("154345",),
         },
@@ -487,7 +484,7 @@ def calculated_account_values(section_code: str | None = None) -> dict[
             "cash_financing": ["154322+045101"],
             "cash_period": "p1_3",
             "parquet_budget": synapse_budget_by_account(
-                dim_1="761", section_code=section_code
+                financing="154322+045101", section_code=section_code
             ),
             "actual_financings": ("154322", "045101"),
         },

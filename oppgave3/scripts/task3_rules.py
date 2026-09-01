@@ -39,8 +39,8 @@ class Task3Rules:
     budget_version: str
     sections: tuple[str, ...]
     account_categories: dict[str, AccountRange]
-    budget_financing_by_section: dict[str, str]
-    budget_financing_default: str
+    budget_financing_field: str
+    missing_financing_label: str
     combined_financing_members: tuple[str, ...]
     combined_financing_label: str
     cash: CashRule
@@ -79,6 +79,8 @@ def load_task3_rules(path: Path | None = None) -> Task3Rules:
     cash = raw["cash_712"]
     combined = raw["combined_financing"]
     budget = raw["budget_financing"]
+    if budget.get("field") != "dim_4":
+        raise Task3RulesError("Budsjettfinansiering skal hentes fra dim_4")
 
     return Task3Rules(
         rule_version=str(raw["rule_version"]),
@@ -87,8 +89,8 @@ def load_task3_rules(path: Path | None = None) -> Task3Rules:
         budget_version=str(raw["budget_version"]),
         sections=sections,
         account_categories=categories,
-        budget_financing_by_section={str(key): str(value) for key, value in budget["by_section"].items()},
-        budget_financing_default=str(budget["default"]),
+        budget_financing_field=str(budget["field"]),
+        missing_financing_label=str(budget["missing_label"]),
         combined_financing_members=tuple(str(value) for value in combined["members"]),
         combined_financing_label=str(combined["label"]),
         cash=CashRule(

@@ -11,6 +11,7 @@
     "test:upload-files": "uv run python -m unittest tests.test_upload_testdata -v",
     "test:storage": "node --test tests/task1_storage.test.js",
     "test:e2e": "playwright test",
+    "test:upload": "playwright test --config playwright.upload.config.js",
     "sources": "evidence sources --strict",
     "build:web": "uv run python ../../scripts/clean_static_build.py . && env -u INIT_CWD -u npm_config_local_prefix evidence build:strict",
     "build:public:web": "python ../../scripts/clean_static_build.py . && vite build --config vite.public.config.js",

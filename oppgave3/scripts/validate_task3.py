@@ -13,6 +13,9 @@ except ImportError:
     from task3_rules import load_task3_rules
 
 
+from shared.budget_version import budget_version_sql
+
+
 ROOT = Path(__file__).resolve().parents[1]
 RULES = load_task3_rules()
 SOURCES = task3_sources()
@@ -126,7 +129,7 @@ def main() -> None:
               count(distinct omfang_id) filter (where omfang = 'Seksjon') as seksjoner,
               count(*) filter (where omfang = 'Nkom' and kategori = 'Driftskostnader') as nkom_finansieringer,
               count(*) filter (
-                where budsjettversjon <> substr(periode, 1, 4) || 'B'
+                where budsjettversjon <> {budget_version_sql("substr(periode, 1, 4)")}
               ) as feil_budsjettversjon
             from read_parquet('{MONTHLY_SUMMARY_PATH.as_posix()}')
             """

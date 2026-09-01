@@ -47,8 +47,8 @@ class UploadTestdataTest(unittest.TestCase):
             frames[filename] = frame
             self.assertEqual(len(frame), 27, filename)
             self.assertEqual(set(frame["period_key"]), {"p1_3", "p1_4", "p1_6"})
-            self.assertEqual(set(frame["regelversjon"]), {"2026-08-06"})
-            self.assertEqual(set(frame["budsjettversjon"]), {"2026B"})
+            self.assertEqual(set(frame["regelversjon"]), {"2026-09-07"})
+            self.assertEqual(set(frame["budsjettversjon"]), {"2026RV"})
             self.assertEqual(frame.groupby("period_key").size().to_dict(), {
                 "p1_3": 9,
                 "p1_4": 9,

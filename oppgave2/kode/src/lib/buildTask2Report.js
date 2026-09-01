@@ -1,4 +1,6 @@
 import { openLocalDuckDb } from './localDuckDb.js';
+import { budgetVersionForYear, budgetVersionSql } from '../../../../shared/budgetVersion.js';
+import { financingSql, requireBudgetFinancing } from '../../../../shared/financing.js';
 
 const SOURCE_FILES = [
   'agltransact.parquet',
@@ -69,11 +71,12 @@ const expandedQuery = (base) => `
 export const buildTask2Report = async (files) => {
   const db = await openLocalDuckDb(files, SOURCE_FILES);
   try {
+    await requireBudgetFinancing(db);
     const [actual, budget, cash, structure, sectionRows, periods] = await Promise.all([
       db.query(expandedQuery(`
         select trim(period) as period,
           coalesce(nullif(trim(dim_1), ''), '__missing__') as section_code,
-          case when trim(dim_4) in ('154322', '045101') then '154322+045101' else trim(dim_4) end as financing,
+          ${financingSql('dim_4')} as financing,
           lpad(trim(account), 4, '0') as konto,
           try_cast(amount as double) / 1000.0 as value
         from read_parquet('agltransact.parquet')
@@ -83,21 +86,19 @@ export const buildTask2Report = async (files) => {
       db.query(expandedQuery(`
         select trim(v.period) as period,
           coalesce(nullif(trim(h.dim_1), ''), '__missing__') as section_code,
-          case when trim(h.dim_1) = '212' then '154345'
-               when trim(h.dim_1) = '761' then '154322+045101'
-               else '154301' end as financing,
+          ${financingSql('h.dim_4')} as financing,
           lpad(trim(h.account), 4, '0') as konto,
           coalesce(try_cast(v.amount as double), try_cast(v.amount1 as double)) / 1000.0 as value
         from read_parquet('apltransact.parquet') h
         join read_parquet('apltransactvalue.parquet') v using (trans_id)
-        where h.version = substr(trim(v.period), 1, 4) || 'B'
+        where h.version = ${budgetVersionSql("substr(trim(v.period), 1, 4)")}
           and regexp_matches(trim(v.period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
           and ${accountFilterSql('h.account')}
       `)),
       db.query(expandedQuery(`
         select trim(pay_period) as period,
           coalesce(nullif(trim(dim_1), ''), '__missing__') as section_code,
-          case when trim(dim_4) in ('154322', '045101') then '154322+045101' else trim(dim_4) end as financing,
+          ${financingSql('dim_4')} as financing,
           lpad(trim(account), 4, '0') as konto,
           try_cast(cash_amount as double) / 1000.0 as value
         from read_parquet('acatrans.parquet')
@@ -144,6 +145,12 @@ export const buildTask2Report = async (files) => {
     const actualMap = valueMap(actual);
     const budgetMap = valueMap(budget);
     const cashMap = valueMap(cash);
+    const knownFinancings = new Set(FINANCING_OPTIONS.map(([code]) => code));
+    const additionalFinancings = [...new Set([...actual, ...budget, ...cash].map((row) => row.financing))]
+      .filter((code) => !knownFinancings.has(code))
+      .sort((left, right) => left.localeCompare(right, 'nb-NO'))
+      .map((code) => [code, code === 'Uten finansiering' ? code : `Finansiering ${code}`]);
+    const financingOptions = [...FINANCING_OPTIONS.slice(0, -1), ...additionalFinancings, FINANCING_OPTIONS.at(-1)];
     const scopes = [
       { section_code: 'all', section_name: 'Alle seksjoner', section_label: 'Alle seksjoner', section_sort: 0 },
       ...sectionRows.map((row) => ({
@@ -163,7 +170,7 @@ export const buildTask2Report = async (files) => {
     const reportRows = [];
 
     for (const scope of scopes) {
-      for (const [financing, financingLabel] of FINANCING_OPTIONS) {
+      for (const [financing, financingLabel] of financingOptions) {
         for (const { period: endPeriod } of periods) {
           const year = Number(endPeriod.slice(0, 4));
           const endMonth = Number(endPeriod.slice(4));
@@ -175,7 +182,7 @@ export const buildTask2Report = async (files) => {
             report_year: year,
             period_to: Number(endPeriod),
             periodetekst: `Januar–${MONTH_NAMES[endMonth - 1]} ${year}`,
-            budsjettversjon: `${year}B`
+            budsjettversjon: budgetVersionForYear(year)
           };
           const accountsByNumber = new Map();
           for (const account of structure) {

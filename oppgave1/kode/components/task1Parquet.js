@@ -1,8 +1,10 @@
 import { parquetReadObjects } from 'hyparquet';
 import { compressors } from 'hyparquet-compressors';
+import { budgetVersionForYear } from '../../../shared/budgetVersion.js';
+import { reportFinancing } from '../../../shared/financing.js';
 
-export const BUSINESS_RULE_VERSION = '2026-08-06';
-export const BUDGET_VERSION = '2026B';
+export const BUSINESS_RULE_VERSION = '2026-09-07';
+export const BUDGET_VERSION = budgetVersionForYear(2026);
 
 const PERIODS = {
   202601: '202601',
@@ -61,7 +63,7 @@ export const buildSectionDashboardRowsFromSources = ({
   const actual = actualRows
     .map((row) => ({
       account: text(row.account),
-      dim_4: text(row.dim_4),
+      dim_4: reportFinancing(row.dim_4),
       dim_2: text(row.dim_2),
       section_code: text(row.dim_1) || '__missing__',
       period: text(row.period),
@@ -73,12 +75,12 @@ export const buildSectionDashboardRowsFromSources = ({
   const budget = budgetValueRows.flatMap((valueRow) => {
     const header = headers.get(text(valueRow.trans_id));
     const period = text(valueRow.period);
-    if (!header || !validPeriod(period) || text(header.version) !== `${period.slice(0, 4)}B`) return [];
+    if (!header || !validPeriod(period) || text(header.version) !== budgetVersionForYear(period.slice(0, 4))) return [];
     return [{
       account: text(header.account),
       dim_2: text(header.dim_2),
       section_code: text(header.dim_1) || '__missing__',
-      financing: budgetFinancing(header.dim_1),
+      financing: reportFinancing(header.dim_4),
       period,
       amount_tusen: number(valueRow.amount) ?? number(valueRow.amount1) ?? 0
     }].map((row) => ({ ...row, amount_tusen: row.amount_tusen / 1000 }));
@@ -150,14 +152,14 @@ export const buildSectionDashboardRowsFromSources = ({
             .format(new Date(year, month - 1, 1)).replace(/^./, (letter) => letter.toLocaleUpperCase('nb-NO')),
           period_sort: Number(endPeriod),
           is_latest_period: endPeriod === latestPeriod,
-          budsjettversjon: `${year}B`,
+          budsjettversjon: budgetVersionForYear(year),
           finansiering: rule.financing,
           metric: rule.metric,
           tittel: rule.title,
           beregningsregel: calculationRule(rule),
           regelversjon: BUSINESS_RULE_VERSION,
           kilde_hovedbok: 'agltransact.parquet',
-          kilde_budsjett: 'apltransact.parquet + apltransactvalue.parquet, opprinnelig budsjett for valgt år'
+          kilde_budsjett: 'apltransact.parquet + apltransactvalue.parquet, 2026RV for 2026, opprinnelig budsjett for øvrige år'
         };
 
         if (rule.ratioNumerator && rule.ratioDenominator) {
@@ -240,13 +242,6 @@ const number = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const budgetFinancing = (dim1) => {
-  const value = text(dim1);
-  if (value === '212') return '154345';
-  if (value === '761') return '154322+045101';
-  return '154301';
-};
-
 const accountMatches = (row, rule) => {
   const account = text(row.account);
   if (rule.accounts) return rule.accounts.includes(account);
@@ -256,9 +251,7 @@ const accountMatches = (row, rule) => {
     && accountNumber <= rule.accountTo;
 };
 
-const actualMatchesFinancing = (row, financing) => financing === '154322+045101'
-  ? ['154322', '045101'].includes(text(row.dim_4))
-  : text(row.dim_4) === financing;
+const actualMatchesFinancing = (row, financing) => reportFinancing(row.dim_4) === financing;
 
 const sumAmounts = (rows) => rows.reduce((total, row) => total + (number(row.amount_tusen) ?? 0), 0);
 
@@ -445,7 +438,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
   const actual = actualRows
     .map((row) => ({
       account: text(row.account),
-      dim_4: text(row.dim_4),
+      dim_4: reportFinancing(row.dim_4),
       dim_2: text(row.dim_2),
       period: text(row.period),
       amount_tusen: (number(row.amount) ?? 0) / 1000
@@ -465,7 +458,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
       account: text(header.account),
       dim_1: text(header.dim_1),
       dim_2: text(header.dim_2),
-      financing: budgetFinancing(header.dim_1),
+      financing: reportFinancing(header.dim_4),
       period,
       amount_tusen: (number(valueRow.amount) ?? 0) / 1000
     }];
@@ -589,7 +582,7 @@ const requireReportingCoverage = (periods, label) => {
 
 export const validateOperationalDatasets = ({ actual, budgetHeader, budgetValue }) => {
   requireColumns(actual, ['account', 'dim_4', 'dim_2', 'period', 'amount']);
-  requireColumns(budgetHeader, ['trans_id', 'account', 'dim_1', 'dim_2', 'version']);
+  requireColumns(budgetHeader, ['trans_id', 'account', 'dim_1', 'dim_2', 'dim_4', 'version']);
   requireColumns(budgetValue, ['trans_id', 'period', 'amount']);
 
   if (!actual.rows.length || !budgetHeader.rows.length || !budgetValue.rows.length) {

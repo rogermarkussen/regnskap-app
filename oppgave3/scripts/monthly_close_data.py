@@ -17,6 +17,9 @@ except ImportError:
     from task3_rules import load_task3_rules
 
 
+from shared.budget_version import budget_version_for_year
+
+
 RULES = load_task3_rules()
 SECTIONS = RULES.sections
 TEMPLATE_NAME = "Ønsket mal_mnds avsl.xlsx"
@@ -84,16 +87,7 @@ def _category_case(alias: str) -> str:
 
 
 def _budget_financing_case(alias: str) -> str:
-    branches = "\n".join(
-        f"when trim({alias}.dim_1) = '{section}' then '{financing}'"
-        for section, financing in RULES.budget_financing_by_section.items()
-    )
-    return f"""
-        case
-          {branches}
-          else '{RULES.budget_financing_default}'
-        end
-    """
+    return _actual_financing(alias)
 
 
 def _actual_financing(alias: str) -> str:
@@ -101,7 +95,7 @@ def _actual_financing(alias: str) -> str:
     return f"""
         case
           when trim({alias}.dim_4) in ({members}) then '{RULES.combined_financing_label}'
-          else coalesce(nullif(trim({alias}.dim_4), ''), 'Uten finansiering')
+          else coalesce(nullif(trim({alias}.dim_4), ''), '{RULES.missing_financing_label}')
         end
     """
 
@@ -147,7 +141,7 @@ def _summary_frame(
 ) -> pd.DataFrame:
     previous_period = f"{int(period) - 1:06d}"
     year_start = f"{period[:4]}01"
-    budget_version = f"{period[:4]}B"
+    budget_version = budget_version_for_year(period[:4])
     budget_amount = _budget_amount_sql(conn, budget_value_path)
     categories = pd.DataFrame(
         [
@@ -926,7 +920,7 @@ def _fill_workbook(
         total_ws,
         synthetic,
         f"Totalt eks {RULES.cash.section}",
-        RULES.budget_financing_default,
+        "154301",
         ("C", "D", "E"),
         ("G", "H", "I"),
         None,
@@ -1136,7 +1130,7 @@ def build_monthly_close(root: Path) -> MonthlyCloseResult:
         [
             {"kontroll": "Aktuell periode", "status": "ok", "antall": 1, "detalj": f"Siste hovedboksperiode er {period}."},
             {"kontroll": "Seksjoner i mal", "status": "ok", "antall": len(SECTIONS), "detalj": f"Malen dekker {', '.join(SECTIONS)}."},
-            {"kontroll": "Budsjettversjon", "status": "ok", "antall": len({str(value) for value in summary['budsjettversjon']}), "detalj": f"Opprinnelig budsjett per rapportår er brukt ({summary['budsjettversjon'].min()}–{summary['budsjettversjon'].max()})."},
+            {"kontroll": "Budsjettversjon", "status": "ok", "antall": len({str(value) for value in summary['budsjettversjon']}), "detalj": f"2026RV for 2026 og opprinnelig budsjett for øvrige rapportår er brukt ({summary['budsjettversjon'].min()}–{summary['budsjettversjon'].max()})."},
             {"kontroll": "Aktuelle kandidater til fakturakontroll", "status": "warning" if len(current_invoices) else "ok", "antall": len(current_invoices), "detalj": f"Ikke bokført i snapshot, har {RULES.workflow_candidates.active_status}-oppgave, siste fullførte handling {actions_text} og er høyst {stale_days} dager gammel. Endelig fakturastatus må godkjennes."},
             {"kontroll": "Manglende fakturadimensjoner", "status": "warning" if missing_dimensions else "ok", "antall": missing_dimensions, "detalj": "Konto, seksjon og finansiering leses fra workflow-loggen."},
             {"kontroll": "Historiske workflowposter", "status": "warning" if stale_invoices else "ok", "antall": stale_invoices, "detalj": f"Poster eldre enn {stale_days} dager holdes utenfor arbeidslisten og må bekreftes mot fakturasystemet."},

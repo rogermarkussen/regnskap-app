@@ -16,7 +16,9 @@ class Task3RulesTest(unittest.TestCase):
         rules = load_task3_rules()
 
         self.assertEqual(rules.report_year, 2026)
-        self.assertEqual(rules.budget_version, "2026B")
+        self.assertEqual(rules.budget_version, "2026RV")
+        self.assertEqual(rules.budget_financing_field, "dim_4")
+        self.assertEqual(rules.missing_financing_label, "Uten finansiering")
         self.assertEqual(rules.cash.section, "712")
         self.assertEqual(set(rules.workflow_candidates.completed_actions), {"ATTEST", "BDMGOD"})
         self.assertFalse(

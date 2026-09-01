@@ -100,16 +100,10 @@ Hovedbok bruker `dim_4`:
 - tom `dim_4` vises som `Uten finansiering`;
 - andre koder beholder sin opprinnelige verdi.
 
-Budsjettkilden har ikke `dim_4`. Finansiering utledes derfor fra
-`apltransact.dim_1`:
-
-| `dim_1` | Utledet finansiering |
-| --- | --- |
-| `212` | `154345` |
-| `761` | `154322+045101` |
-| Alle andre verdier | `154301` |
-
-Budsjettmappingen er teknisk implementert og avstemt, men ikke faglig godkjent.
+Budsjettet bruker fra 7. september 2026 faktisk `apltransact.dim_4`, med samme
+sammenslåing og behandling av tom kode som hovedboken. Det oppdaterte
+budsjettuttrekket har `att_4_id = R00`. Koststed (`dim_1`) brukes til
+seksjonsutvalg og gir ikke en reservekode for finansiering.
 
 ### Hovedbok, budsjett og avvik
 
@@ -121,7 +115,7 @@ budsjett = SUM(apltransactvalue.amount), koblet til apltransact med trans_id
 avvik = budsjett - hovedbok
 ```
 
-Bare budsjettversjon `2026B` brukes. Når kilden finnes, men kombinasjonen ikke
+Bare budsjettversjon `2026RV` brukes. Når kilden finnes, men kombinasjonen ikke
 har posteringer, vises `0`. Når en nødvendig kilde eller regel faktisk mangler,
 vises `–` eller en forklaring.
 
@@ -290,18 +284,18 @@ Dette er den mest komplette tabellen for beregnede regnskaps- og budsjetttall.
 | --- | --- | --- |
 | A – Periode | Aktuell periode | Periodeberegningen fra hovedbok |
 | B – Seksjon | Rapportseksjon | `dim_1`, begrenset til 711, 712, 721, 731 og 741 |
-| C – Finansiering | Normalisert finansiering | Hovedbok `dim_4` eller budsjettmapping fra `dim_1` |
+| C – Finansiering | Normalisert finansiering | `dim_4` fra hovedbok eller budsjett |
 | D – Kategori | Lønn, avskrivninger, ADK, driftskostnader eller tilskudd | Kontointervall/regelkategori |
 | E – Hovedbok måned | Faktisk beløp aktuell måned | `SUM(agltransact.amount)` |
-| F – Budsjett måned | Budsjett aktuell måned | `SUM(apltransactvalue.amount)` for 2026B |
+| F – Budsjett måned | Budsjett aktuell måned | `SUM(apltransactvalue.amount)` for 2026RV |
 | G – Diff måned | Avvik aktuell måned | F minus E |
 | H – Hovedbok forrige måned | Faktisk beløp 202605 | `SUM(agltransact.amount)` |
 | I – Budsjett forrige måned | Budsjett 202605 | `SUM(apltransactvalue.amount)` |
 | J – Diff forrige måned | Avvik 202605 | I minus H |
 | K – Hovedbok hittil i år | Faktisk beløp 202601–202606 | Sum hovedbok |
-| L – Budsjett hittil i år | Budsjett 202601–202606 | Sum budsjett 2026B |
+| L – Budsjett hittil i år | Budsjett 202601–202606 | Sum budsjett 2026RV |
 | M – Diff hittil i år | Avvik hittil i år | L minus K |
-| N – Budsjettversjon | Brukt budsjettversjon | `2026B` fra regelkonfigurasjonen |
+| N – Budsjettversjon | Brukt budsjettversjon | `2026RV` fra regelkonfigurasjonen |
 | O – Kildestatus | Om tallet er beregnet, foreløpig eller mangler kilde | Generatorens statusfelt |
 
 ### `Nkom per finansiering`
@@ -319,7 +313,7 @@ Arket summerer alle seksjoner per finansiering og kategori.
 | G – Hovedbok hittil i år | Nkom-total 202601–202606 | Sum alle seksjoner |
 | H – Budsjett hittil i år | Nkom-budsjett 202601–202606 | Sum alle seksjoner |
 | I – Diff hittil i år | Avvik hittil i år | H minus G |
-| J – Budsjettversjon | Brukt versjon | `2026B` |
+| J – Budsjettversjon | Brukt versjon | `2026RV` |
 
 ### `712 kontantdetaljer`
 
@@ -455,7 +449,7 @@ Eksempel for `711 - SID!D7`, lønnsbudsjett i juni 2026:
 select sum(try_cast(v.amount as double)) as budsjett_nok
 from read_parquet('data/apltransact.parquet') h
 join read_parquet('data/apltransactvalue.parquet') v using (trans_id)
-where h.version = '2026B'
+where h.version = '2026RV'
   and trim(h.dim_1) = '711'
   and trim(v.period) = '202606'
   and try_cast(h.account as integer) between 5000 and 5999;
@@ -513,7 +507,7 @@ Følgende krever beslutning fra økonomi eller workfloweier:
 2. Verdiene og formlene i det skjulte `Avsetningsbilag`-arket.
 3. Om konto `8720` og finansiering `154370` er riktig kontantgrunnlag for 712.
 4. Hvor kontantbudsjettet for 712 skal hentes fra.
-5. Om budsjettmappingen fra `dim_1` til finansiering er en godkjent varig regel.
+5. Avklar budsjettposter som mangler finansieringskode i `dim_4` hos kilden.
 6. Prosjektmapping for tilleggsforslag, overligger og nye ansvarsområder.
 7. Hvilke workflowstatuser som faktisk skal utløse avsetning.
 8. Bilagsart, motkonto, fortegn, reversering og godkjenningsløp.

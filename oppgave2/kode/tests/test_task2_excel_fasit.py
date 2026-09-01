@@ -34,17 +34,17 @@ SHEETS = {
     "Finansiering 154301": {
         "period_to": 202603,
         "actual_filter": "trim(dim_4) = '154301'",
-        "budget_filter": "(h.dim_1 is null or trim(h.dim_1) not in ('212', '761'))",
+        "budget_filter": "trim(h.dim_4) = '154301'",
     },
     "Finansiering 154345": {
         "period_to": 202604,
         "actual_filter": "trim(dim_4) = '154345'",
-        "budget_filter": "trim(h.dim_1) = '212'",
+        "budget_filter": "trim(h.dim_4) = '154345'",
     },
     "Fin 154322 og 045101": {
         "period_to": 202603,
         "actual_filter": "trim(dim_4) in ('154322', '045101')",
-        "budget_filter": "trim(h.dim_1) = '761'",
+        "budget_filter": "trim(h.dim_4) in ('154322', '045101')",
     },
 }
 

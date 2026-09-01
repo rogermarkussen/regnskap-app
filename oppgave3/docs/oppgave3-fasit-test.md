@@ -1,5 +1,10 @@
 # Oppgave 3 – test mot Excel-fasit
 
+> Oppdatert 07.09.2026: Appene bruker `2026RV` og finansiering fra `dim_4` for
+> rapportåret 2026. Eldre avstemminger mot `2026B` nedenfor er historiske.
+> De nye opplastingstestene avstemmer direkte mot RV i `data/lokaldata`;
+> forventningsverdiene i gamle Excel-fasitfiler er ikke endret.
+
 ## Formål
 
 Testpakken sammenligner beregningene i oppgave 3 med de uavhengige

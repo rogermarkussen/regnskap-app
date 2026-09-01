@@ -55,7 +55,7 @@ data/apltransact.parquet
 data/apltransactvalue.parquet
 ```
 
-Filene kobles med `trans_id`. Rapporten bruker budsjettversjon `2026B`.
+Filene kobles med `trans_id`. Rapporten bruker budsjettversjon `2026RV`.
 Budsjettverdiene finnes for alle tolv måneder.
 
 ### Kontogrupper
@@ -87,10 +87,14 @@ to regnskapene har forskjellig periodisering.
 
 | Rapportvalg | Hovedbok | Budsjett |
 | --- | --- | --- |
-| `154301` | `dim_4 = 154301` | Budsjett uten `dim_1 = 212` og `dim_1 = 761` |
-| `154345` | `dim_4 = 154345` | `dim_1 = 212` |
-| `154322 + 045101` | `dim_4 IN (154322, 045101)` | `dim_1 = 761` |
-| Alle finansieringer | Alle finansieringskoder på driftskostnadskonto 5000–7834 | Hele budsjettversjon `2026B` |
+| `154301` | `dim_4 = 154301` | `dim_4 = 154301` |
+| `154345` | `dim_4 = 154345` | `dim_4 = 154345` |
+| `154322 + 045101` | `dim_4 IN (154322, 045101)` | `dim_4 IN (154322, 045101)` |
+| Alle finansieringer | Alle finansieringskoder på driftskostnadskonto 5000–7834 | Hele budsjettversjon `2026RV` |
+
+Fra 7. september 2026 brukes faktisk `apltransact.dim_4` i alle
+budsjettberegninger. Andre finansieringskoder og `Uten finansiering` blir egne
+valg når de finnes i datagrunnlaget. Koststed gir ikke lenger finansieringskode.
 
 Kontoomfanget er avgjørende for samlet visning. Inntekts- og finansposter
 utenfor 5000–7834 skal ikke inngå i driftskostnadene. Innenfor dette

@@ -9,6 +9,14 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+try:
+    from .project_data import REPO_ROOT
+except ImportError:
+    from project_data import REPO_ROOT
+
+from shared.financing import financing_sql
+from shared.budget_version import budget_version_for_year, budget_version_sql
+
 
 MONTH_NAMES = (
     "Januar",
@@ -53,22 +61,11 @@ class ParquetReportSources:
 
 
 def _financing_sql(alias: str, field: str = "dim_4") -> str:
-    return f"""
-        case
-          when trim({alias}.{field}) in ('154322', '045101') then '154322+045101'
-          else trim({alias}.{field})
-        end
-    """
+    return financing_sql(f"{alias}.{field}")
 
 
 def _budget_financing_sql(alias: str) -> str:
-    return f"""
-        case
-          when trim({alias}.dim_1) = '212' then '154345'
-          when trim({alias}.dim_1) = '761' then '154322+045101'
-          else '154301'
-        end
-    """
+    return _financing_sql(alias)
 
 
 def _expanded_values(
@@ -101,7 +98,7 @@ def _expanded_values(
               ) / 1000.0 as value
             from read_parquet('{sources.budget_header.as_posix()}') h
             join read_parquet('{sources.budget_values.as_posix()}') v using (trans_id)
-            where h.version = substr(trim(v.period), 1, 4) || 'B'
+            where h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
               and regexp_matches(trim(v.period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
               and {_account_filter_sql('h.account')}
         """
@@ -316,6 +313,17 @@ def build_parquet_report(
     actual_map = _value_maps(actual)
     budget_map = _value_maps(budget)
     cash_map = _value_maps(cash)
+    known_financings = {code for code, _ in FINANCING_OPTIONS}
+    additional_financings = sorted(
+        (set(actual["financing"]) | set(budget["financing"]) | set(cash["financing"]))
+        - known_financings
+    )
+    financing_options = (
+        *FINANCING_OPTIONS[:-1],
+        *((code, code if code == "Uten finansiering" else f"Finansiering {code}")
+          for code in additional_financings),
+        FINANCING_OPTIONS[-1],
+    )
     month_columns = [f"budsjett_{month:02d}_tusen" for month in range(1, 13)]
     value_columns = [
         "virksomhet_budsjett_tusen",
@@ -336,12 +344,12 @@ def build_parquet_report(
 
     for scope in scopes:
         section_code = str(scope["section_code"])
-        for financing, financing_label in FINANCING_OPTIONS:
+        for financing, financing_label in financing_options:
             for end_period in periods:
                 year = int(end_period[:4])
                 end_month = int(end_period[4:])
                 period_label = f"Januar–{MONTH_NAMES[end_month - 1].lower()} {year}"
-                budget_version = f"{year}B"
+                budget_version = budget_version_for_year(year)
                 account_rows_by_number: dict[str, dict[str, object]] = {}
                 for account in structure:
                     number = str(account["konto"])

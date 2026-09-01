@@ -64,6 +64,38 @@ kontantregnskap, men holder kontantbudsjett og kontantavvik tomme.
 
 ## Datakontrakten
 
+### Opplastingssnapshot med finansiering
+
+De tolv filene i den lokale `data/lokaldata/`-mappen er kontrollert mot et
+uforanderlig snapshot under ekstern datarot:
+`snapshots/2026-09-07-lokaldata-dim4/operative/`. Oppføringene `upload.*` og
+`upload_snapshot_id` i `data-manifest.json` beskriver dette snapshotet.
+De tre budsjettfilene fra `lokaldata/snapshot/` er flyttet opp til fellesmappen.
+De erstattede filene er arkivert utenfor repositoryet.
+
+Kontroller snapshotet og eventuelt opplastingsmappen:
+
+```bash
+npm run check:upload-data
+python scripts/validate_data_contract.py --upload --folder data/lokaldata
+REGNSKAP_COMMON_DATA_FOLDER="$PWD/data/lokaldata" npm run test:upload-apps
+```
+
+Alle tre apper bruker `apltransact.dim_4` som budsjettets finansiering.
+Koststed (`dim_1`) brukes bare til seksjonsutvalg, aldri som reserveverdi for
+finansiering. `154322` og `045101` vises fortsatt samlet. Tom kode vises som
+`Uten finansiering`. Andre koder beholdes og kan velges i kontogrupperingen.
+Opplastingen avviser budsjettfiler der hele `dim_4`-kolonnen mangler.
+Rapportåret 2026 bruker utelukkende revidert budsjett (`2026RV`), uten reserveverdi
+fra `2026B`. Tidligere rapportår beholder opprinnelig budsjett (`ÅÅÅÅB`).
+
+Dette nye opplastingssnapshotet erstatter ikke de historiske `common.*`- og
+fasitoppføringene. Det eldre komplette testløpet og internbygget krever fortsatt
+at kildene fra snapshot `2026-08-23` finnes. En gammel budsjettkilde uten `dim_4`
+må oppdateres fra operative data før den kan brukes med den nye beregningen.
+
+### Felles kontrakt
+
 [`data-manifest.json`](data-manifest.json) er den eneste autoritative
 koblingen fra kode til data. Hver oppføring har:
 

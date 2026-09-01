@@ -6,6 +6,9 @@
   "scripts": {
     "install:all": "npm --prefix oppgave1/kode ci && npm --prefix oppgave2/kode ci && npm --prefix oppgave3 ci",
     "check:data": "python scripts/validate_data_contract.py",
+    "check:upload-data": "python scripts/validate_data_contract.py --upload",
+    "test:financing": "node --test tests/financing.test.mjs && python -m unittest tests.test_financing -v",
+    "test:upload-apps": "npm --prefix oppgave1/kode run test:upload",
     "test:contract": "python -m unittest tests.test_data_contract -v",
     "audit:task1": "npm --prefix oppgave1/kode audit --omit=dev",
     "audit:task2": "npm --prefix oppgave2/kode audit --omit=dev",

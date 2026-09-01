@@ -1,5 +1,10 @@
 # Oppgave 1 – tallsporbarhet og fasittest
 
+> Oppdatert 07.09.2026: Appene bruker `2026RV` og finansiering fra `dim_4` for
+> rapportåret 2026. Eldre avstemminger mot `2026B` nedenfor er historiske.
+> De nye opplastingstestene avstemmer direkte mot RV i `data/lokaldata`;
+> forventningsverdiene i gamle Excel-fasitfiler er ikke endret.
+
 > Datastiene i dette dokumentet er logiske kilder. De fysiske filene ligger
 > under den eksterne dataroten og slås opp som `common.ledger`,
 > `common.budget_header`, `common.budget_values` og `fasit.dashboard_kpi` i
@@ -20,9 +25,9 @@ beregningsmodulen eller dashboardet.
 | --- | --- | --- |
 | Hovedbok | `data/agltransact.parquet` | Summeres per finansiering, periode og kontoregel |
 | Budsjett | `data/apltransact.parquet` + `data/apltransactvalue.parquet` | Versjon `2026B` |
-| `154301` budsjett | Samme budsjettfiler | `dim_1` er verken `212` eller `761` |
-| `154345` budsjett | Samme budsjettfiler | `dim_1 = 212` |
-| `154322+045101` budsjett | Samme budsjettfiler | `dim_1 = 761` |
+| `154301` budsjett | Samme budsjettfiler | `dim_4 = 154301` |
+| `154345` budsjett | Samme budsjettfiler | `dim_4 = 154345` |
+| `154322+045101` budsjett | Samme budsjettfiler | `dim_4 IN (154322, 045101)` |
 | Testlab | Hovedbok med `dim_2 = 7114`, konto `5000–7834` | Budsjett vises som manglende når kilden ikke har rader |
 
 Rapportperiodene er januar–mars, januar–april og januar–juni 2026.

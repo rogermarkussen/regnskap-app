@@ -166,11 +166,11 @@ test('beregnet Parquet avvises ved duplikater og feil regelversjon', async () =>
 
   const wrongVersionRows = expectedRows.map((row) => ({ ...row }));
   wrongVersionRows[0].regelversjon = 'ukontrollert-versjon';
-  assert.throws(() => validateCalculatedRows(wrongVersionRows), /regelversjon 2026-08-06/);
+  assert.throws(() => validateCalculatedRows(wrongVersionRows), /regelversjon 2026-09-07/);
 
   const wrongBudgetVersionRows = expectedRows.map((row) => ({ ...row }));
   wrongBudgetVersionRows[0].budsjettversjon = '2025B';
-  assert.throws(() => validateCalculatedRows(wrongBudgetVersionRows), /budsjettversjon 2026B/);
+  assert.throws(() => validateCalculatedRows(wrongBudgetVersionRows), /budsjettversjon 2026RV/);
 
   const inconsistentBasisRows = expectedRows.map((row) => ({ ...row }));
   const cashRow = inconsistentBasisRows.find((row) => row.prosentverdi === null);
@@ -205,7 +205,7 @@ test('operative Parquet-filer avvises ved ugyldige beløp og koblingsnøkler', a
 
   const wrongVersion = structuredClone(datasets);
   wrongVersion.budgetHeader.rows.forEach((row) => { row.version = '2025B'; });
-  assert.throws(() => validateOperationalDatasets(wrongVersion), /ingen rader for versjon 2026B/);
+  assert.throws(() => validateOperationalDatasets(wrongVersion), /ingen rader for versjon 2026RV/);
 
   const missingPeriod = structuredClone(datasets);
   missingPeriod.actual.rows = missingPeriod.actual.rows.filter((row) => row.period !== '202606');

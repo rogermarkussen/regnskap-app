@@ -37,7 +37,7 @@ def validate_multiyear_parquet_report() -> bool:
               min(rapportperiode) as min_period,
               max(rapportperiode) as max_period,
               count(distinct report_year) as report_years,
-              count(distinct finansiering) as financings,
+              list(distinct finansiering) as financings,
               count(*) filter (where row_type = 'account') as account_rows,
               count(*) filter (where row_type = 'account' and kontant_tusen is not null) as cash_rows,
               count(*) filter (
@@ -116,7 +116,7 @@ def validate_multiyear_parquet_report() -> bool:
         raise SystemExit(
             f"Uventet periode-/årsdekning: {min_period}–{max_period}, {years} år"
         )
-    if financings != 4 or accounts == 0:
+    if not {"154301", "154345", "154322+045101", "alle"}.issubset(financings) or accounts == 0:
         raise SystemExit("Flerårsrapporten mangler finansieringsvalg eller kontorader")
     if cash_rows == 0 or section_cash_rows == 0:
         raise SystemExit("Kontantregnskapet mangler for samlet visning eller seksjoner")
@@ -279,8 +279,8 @@ def main() -> None:
         raise SystemExit("Forventet én beregnet rad for konto 6735 under alle finansieringer")
     annual, april, november, source_file = account_6735[0]
     if (annual, april, november) != (3000.0, 375.0, 375.0):
-        raise SystemExit("Konto 6735 skal beregnes til 3 000 i årsbudsjett fra 2026B")
-    if "apltransactvalue.parquet (2026B)" not in source_file:
+        raise SystemExit("Konto 6735 skal beregnes til 3 000 i årsbudsjett fra 2026RV")
+    if "apltransactvalue.parquet (2026RV)" not in source_file:
         raise SystemExit("Konto 6735 skal være merket med operativ Parquet-kilde")
 
     errors = validations[validations["status"] == "error"]
