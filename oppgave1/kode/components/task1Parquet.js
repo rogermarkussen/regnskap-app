@@ -1,9 +1,10 @@
+import { includeBudgetHeader } from '../../../shared/budgetExclusions.js';
 import { parquetReadObjects } from 'hyparquet';
 import { compressors } from 'hyparquet-compressors';
 import { budgetVersionForYear } from '../../../shared/budgetVersion.js';
 import { reportFinancing } from '../../../shared/financing.js';
 
-export const BUSINESS_RULE_VERSION = '2026-09-07';
+export const BUSINESS_RULE_VERSION = '2026-09-08';
 export const BUDGET_VERSION = budgetVersionForYear(2026);
 
 const PERIODS = {
@@ -34,8 +35,8 @@ const METRIC_RULES = [
   },
   { financing: '154301', metric: 'Overtid', title: 'Overtid', accounts: ['5050', '5150'] },
   {
-    financing: '154301', metric: 'Lønnsandel av totale kostnader', title: 'Lønnsandel',
-    ratioNumerator: [5000, 5999], ratioDenominator: [5000, 7834]
+    financing: '154301', metric: 'Lønnsandel av andre driftskostnader', title: 'Lønnsandel',
+    ratioNumerator: [5000, 5999], ratioDenominator: [6110, 7834]
   },
   {
     financing: '154345', metric: 'Totalt regnskap vs budsjett',
@@ -47,8 +48,8 @@ const METRIC_RULES = [
     accountFrom: 5000, accountTo: 7834, project: '7114'
   },
   {
-    financing: '154322+045101', metric: 'Lønnsandel av totale kostnader', title: 'Lønnsandel',
-    ratioNumerator: [5000, 5999], ratioDenominator: [5000, 7834]
+    financing: '154322+045101', metric: 'Lønnsandel av andre driftskostnader', title: 'Lønnsandel',
+    ratioNumerator: [5000, 5999], ratioDenominator: [6110, 7834]
   }
 ];
 
@@ -75,7 +76,7 @@ export const buildSectionDashboardRowsFromSources = ({
   const budget = budgetValueRows.flatMap((valueRow) => {
     const header = headers.get(text(valueRow.trans_id));
     const period = text(valueRow.period);
-    if (!header || !validPeriod(period) || text(header.version) !== budgetVersionForYear(period.slice(0, 4))) return [];
+    if (!header || !includeBudgetHeader(header) || !validPeriod(period) || text(header.version) !== budgetVersionForYear(period.slice(0, 4))) return [];
     return [{
       account: text(header.account),
       dim_2: text(header.dim_2),
@@ -168,7 +169,7 @@ export const buildSectionDashboardRowsFromSources = ({
           const ratio = denominator ? numerator / denominator : null;
           const details = [
             { label: 'Lønnskostnader', value: numerator },
-            { label: 'Totale kostnader', value: denominator }
+            { label: 'Andre driftskostnader', value: denominator }
           ];
           if (ratio !== null) details.push({ label: 'Andel (%)', value: ratio * 100, format: 'pct' });
           result.push({
@@ -390,14 +391,15 @@ export const validateCalculatedRows = (inputRows) => {
     const details = validateDetails(row.grunnlag_json, key);
 
     if (rule.ratioNumerator) {
-      if (row.prosentverdi === null) throw new Error(`Mangler prosentverdi for ${key}`);
       const numerator = details.find((detail) => detail.label === 'Lønnskostnader');
-      const denominator = details.find((detail) => detail.label === 'Totale kostnader');
-      if (!numerator || !denominator || number(denominator.value) === 0) {
+      const denominator = details.find((detail) => detail.label === 'Andre driftskostnader');
+      if (!numerator || !denominator) {
         throw new Error(`Ufullstendig prosentgrunnlag for ${key}`);
       }
-      const calculatedRatio = number(numerator.value) / number(denominator.value);
-      if (!closeEnough(calculatedRatio, row.prosentverdi)) {
+      const calculatedRatio = number(denominator.value) === 0
+        ? null : number(numerator.value) / number(denominator.value);
+      if (calculatedRatio === null ? row.prosentverdi !== null
+        : row.prosentverdi === null || !closeEnough(calculatedRatio, row.prosentverdi)) {
         throw new Error(`Prosentverdi stemmer ikke med grunnlaget for ${key}`);
       }
       row.hovedbok_nok1000 = row.prosentverdi;
@@ -405,7 +407,7 @@ export const validateCalculatedRows = (inputRows) => {
       row.budsjettandel = null;
       row.status = null;
       row.status_tekst = null;
-      row.gjenstaar_nok1000 = -row.prosentverdi;
+      row.gjenstaar_nok1000 = row.prosentverdi === null ? null : -row.prosentverdi;
       continue;
     }
 
@@ -447,7 +449,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
 
   const headers = new Map(
     budgetHeaderRows
-      .filter((row) => text(row.version) === BUDGET_VERSION)
+      .filter((row) => text(row.version) === BUDGET_VERSION && includeBudgetHeader(row))
       .map((row) => [text(row.trans_id), row])
   );
   const budget = budgetValueRows.flatMap((valueRow) => {
@@ -480,7 +482,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
         const ratio = denominator ? numerator / denominator : null;
         const details = [
           { label: 'Lønnskostnader', value: numerator },
-          { label: 'Totale kostnader', value: denominator }
+          { label: 'Andre driftskostnader', value: denominator }
         ];
         if (ratio !== null) details.push({ label: 'Andel (%)', value: ratio * 100, format: 'pct' });
         result.push({

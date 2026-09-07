@@ -14,6 +14,7 @@ try:
 except ImportError:
     from project_data import REPO_ROOT
 
+from shared.budget_exclusions import budget_inclusion_sql
 from shared.financing import financing_sql
 from shared.budget_version import budget_version_for_year, budget_version_sql
 
@@ -98,7 +99,8 @@ def _expanded_values(
               ) / 1000.0 as value
             from read_parquet('{sources.budget_header.as_posix()}') h
             join read_parquet('{sources.budget_values.as_posix()}') v using (trans_id)
-            where h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
+            where {budget_inclusion_sql()}
+              and h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
               and regexp_matches(trim(v.period), '^20[0-9]{{2}}(0[1-9]|1[0-2])$')
               and {_account_filter_sql('h.account')}
         """

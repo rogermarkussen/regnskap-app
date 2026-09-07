@@ -16,6 +16,7 @@ except ImportError:
     from project_data import task2_sources
     from parquet_report import INVESTMENT_ACCOUNTS, ParquetReportSources, build_parquet_report
 
+from shared.budget_exclusions import budget_inclusion_sql
 from shared.financing import financing_sql
 
 
@@ -371,7 +372,7 @@ def synapse_budget_by_account(
 
     conn = duckdb.connect()
     try:
-        filters = ["h.version = ?", "try_cast(v.period as integer) between 202601 and 202612"]
+        filters = [budget_inclusion_sql(), "h.version = ?", "try_cast(v.period as integer) between 202601 and 202612"]
         parameters: list[object] = [BUDGET_VERSION]
         if financing is not None:
             filters.append(f"({financing_sql('h.dim_4')}) = ?")

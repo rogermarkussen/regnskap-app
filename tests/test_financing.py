@@ -2,11 +2,22 @@ import json
 import subprocess
 import unittest
 
+from shared.budget_exclusions import budget_inclusion_sql
 from shared.financing import financing_sql, report_financing
 from shared.budget_version import budget_version_for_year, budget_version_sql
 
 
 class FinancingTest(unittest.TestCase):
+    def test_confirmed_duplicate_only(self):
+        rows = json.loads(subprocess.check_output([
+            'duckdb', '-json', '-c',
+            f"SELECT {budget_inclusion_sql()} included FROM (VALUES "
+            "('5219663','2026RV','711'),('5733017','2026RV','771'),"
+            "('42','2026RV','711'),('5219663','2026B','711'),"
+            "('5219663','2026RV',NULL),(NULL,'2026RV','711')) h(trans_id,version,dim_1)"
+        ], text=True))
+        self.assertEqual([row['included'] for row in rows], [False, True, True, True, True, True])
+
     def test_selected_budget_versions(self):
         rows = json.loads(subprocess.check_output([
             'duckdb', '-json', '-c',

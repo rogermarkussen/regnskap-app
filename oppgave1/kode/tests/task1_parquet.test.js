@@ -166,7 +166,7 @@ test('beregnet Parquet avvises ved duplikater og feil regelversjon', async () =>
 
   const wrongVersionRows = expectedRows.map((row) => ({ ...row }));
   wrongVersionRows[0].regelversjon = 'ukontrollert-versjon';
-  assert.throws(() => validateCalculatedRows(wrongVersionRows), /regelversjon 2026-09-07/);
+  assert.throws(() => validateCalculatedRows(wrongVersionRows), /regelversjon 2026-09-08/);
 
   const wrongBudgetVersionRows = expectedRows.map((row) => ({ ...row }));
   wrongBudgetVersionRows[0].budsjettversjon = '2025B';
@@ -210,4 +210,23 @@ test('operative Parquet-filer avvises ved ugyldige beløp og koblingsnøkler', a
   const missingPeriod = structuredClone(datasets);
   missingPeriod.actual.rows = missingPeriod.actual.rows.filter((row) => row.period !== '202606');
   assert.throws(() => validateOperationalDatasets(missingPeriod), /dekke perioden 202601–202606/);
+});
+
+test('beregnet lønnsandel tillater over 100 prosent og null ved null ADK', async () => {
+  const rows = await readRows('../testdata-opplasting/parquet/beregnet/dashboard_kpi_testdata.parquet');
+  const row = rows.find(row => row.tittel === 'Lønnsandel');
+  row.prosentverdi = 3;
+  row.grunnlag_json = JSON.stringify([
+    { label: 'Lønnskostnader', value: 3000 },
+    { label: 'Andre driftskostnader', value: 1000 }
+  ]);
+  assert.doesNotThrow(() => validateCalculatedRows(rows));
+  row.prosentverdi = null;
+  row.grunnlag_json = JSON.stringify([
+    { label: 'Lønnskostnader', value: 3000 },
+    { label: 'Andre driftskostnader', value: 0 }
+  ]);
+  assert.doesNotThrow(() => validateCalculatedRows(rows));
+  row.prosentverdi = 0;
+  assert.throws(() => validateCalculatedRows(rows), /Prosentverdi stemmer ikke/);
 });

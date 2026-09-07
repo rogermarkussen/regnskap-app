@@ -30,7 +30,7 @@ test.describe('budsjettfinansiering ved opplasting', () => {
       const byName = new Map(window.uploadFilesForTest.map((file) => [file.name, [{ file }]]));
       const { rows } = await loadTask1Data({ byName, folderName: 'lokaldata' });
       return rows.filter((row) => row.section_code === 'all' && row.period_key === period)
-        .map((row) => ({ financing: row.finansiering, metric: row.metric, version: row.budsjettversjon, amount: row.budsjett_nok1000 }));
+        .map((row) => ({ financing: row.finansiering, metric: row.metric, version: row.budsjettversjon, amount: row.budsjett_nok1000, ratio: row.prosentverdi }));
     }, period);
     const metrics = [
       ['154301', 'ADK', 'try_cast(h.account as integer) between 6110 and 7834'],
@@ -45,12 +45,22 @@ test.describe('budsjettfinansiering ved opplasting', () => {
       const financingFilter = financing === '154322+045101' ? "h.dim_4 in ('154322','045101')" : `h.dim_4=${quote(financing)}`;
       const [{ amount }] = query(`select sum(cast(v.amount as decimal(24,6))) / 1000 amount
         from ${source('apltransact.parquet')} h join ${source('apltransactvalue.parquet')} v using(trans_id)
-        where h.version='2026RV' and v.period between '202601' and ${quote(period)} and ${financingFilter} and ${predicate}`);
+        where h.version='2026RV' and not (h.trans_id='5219663' and h.dim_1='711') and v.period between '202601' and ${quote(period)} and ${financingFilter} and ${predicate}`);
       const row = actual.find((row) => row.financing === financing && row.metric === metric);
       expect(row.version).toBe('2026RV');
       if (amount === null) expect(row.amount).toBeNull();
       else expect(row.amount).toBeCloseTo(Number(amount), 6);
     }
+    for (const financing of ['154301', '154322+045101']) {
+      const filter = financing === '154301' ? "dim_4='154301'" : "dim_4 in ('154322','045101')";
+      const [{ ratio }] = query(`select
+        sum(cast(amount as decimal(24,6))) filter (where try_cast(account as integer) between 5000 and 5999)
+        / nullif(sum(cast(amount as decimal(24,6))) filter (where try_cast(account as integer) between 6110 and 7834), 0) ratio
+        from ${source('agltransact.parquet')} where period between '202601' and ${quote(period)} and ${filter}`);
+      const row = actual.find((row) => row.financing === financing && row.metric === 'Lønnsandel av andre driftskostnader');
+      expect(row.ratio).toBeCloseTo(Number(ratio), 8);
+    }
+    await expect(page.getByText('Lønn / andre driftskostnader', { exact: true })).toHaveCount(2);
   });
 
   test('kontogrupperingen beholder alle finansieringer og totalbudsjettet', async ({ page }) => {
@@ -58,7 +68,7 @@ test.describe('budsjettfinansiering ved opplasting', () => {
     const expected = query(`select coalesce(case when h.dim_4 in ('154322','045101') then '154322+045101' else nullif(trim(h.dim_4),'') end,'Uten finansiering') financing,
       sum(cast(v.amount as decimal(24,6))) / 1000 amount
       from ${source('apltransact.parquet')} h join ${source('apltransactvalue.parquet')} v using(trans_id)
-      where h.version='2026RV' and v.period between '202601' and '202612'
+      where h.version='2026RV' and not (h.trans_id='5219663' and h.dim_1='711') and v.period between '202601' and '202612'
         and (try_cast(h.account as integer) between 5000 and 7834 or h.account in ('1250','1270','1280','1281'))
       group by 1`);
     await openFolder(page, 3112);
@@ -103,7 +113,7 @@ test.describe('budsjettfinansiering ved opplasting', () => {
     const expected = query(`select coalesce(case when h.dim_4 in ('154322','045101') then '154322+045101' else nullif(trim(h.dim_4),'') end,'Uten finansiering') financing,
       sum(cast(v.amount as decimal(24,6))) amount
       from ${source('apltransact.parquet')} h join ${source('apltransactvalue.parquet')} v using(trans_id)
-      where h.version='2026RV' and v.period between '202601' and ${quote(actual.period)}
+      where h.version='2026RV' and not (h.trans_id='5219663' and h.dim_1='711') and v.period between '202601' and ${quote(actual.period)}
         and try_cast(h.account as integer) between 5000 and 7834 group by 1`);
     const totals = Object.fromEntries(actual.rows.map((row) => [row.financing, row.amount]));
     expect(actual.versions).toEqual(['2026RV']);

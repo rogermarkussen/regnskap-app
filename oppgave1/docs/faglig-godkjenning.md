@@ -4,7 +4,16 @@ Dette dokumentet brukes i et kort avklaringsmøte mellom økonomi og den som
 forvalter rapporten. Målet er å beslutte hva KPI-ene og kontogrupperingen skal
 bety før dataløpet ferdigstilles.
 
-## Beslutninger som må tas
+## Gjeldende endringer etter brukeravklaring
+
+- 07.09.2026: Alle budsjettfinansieringer hentes fra `dim_4`. Den historiske
+  koststedsmappingen nedenfor er opphevet. Rapportåret 2026 bruker `2026RV`.
+- 08.09.2026: Begge lønnsandeler beregnes som lønn `5000–5999` delt på andre
+  driftskostnader `6110–7834`. Beslutningen om totale kostnader er opphevet.
+- 08.09.2026: Kun `2026RV`-post `5219663` på kostnadssted `711` utelates etter
+  bekreftet dobbeltføring. `5733017` på `771` beholdes. Se `DATA.md`.
+
+## Historiske beslutninger fra 6. august 2026
 
 | Tema | Dagens løsning | Spørsmål til økonomi | Beslutning |
 | --- | --- | --- | --- |

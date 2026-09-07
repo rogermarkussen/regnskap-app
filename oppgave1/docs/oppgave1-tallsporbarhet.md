@@ -40,16 +40,23 @@ Rapportperiodene er januar–mars, januar–april og januar–juni 2026.
 | Konsulenter | `6700, 6710, 6720, 6730, 6731, 6732` |
 | Reise | `7100, 7130, 7131, 7150, 7190, 7199` |
 | Overtid | `5050, 5150` |
-| Lønnsandel `154301` | `5000–5999 / 5000–7834` |
-| Lønnsandel `154322+045101` | `5000–5999 / 5000–7834` |
+| Lønnsandel `154301` | `5000–5999 / 6110–7834` |
+| Lønnsandel `154322+045101` | `5000–5999 / 6110–7834` |
 
-Reglene er faglig godkjent 6. august 2026 og versjonert som `2026-08-06` i
-det publiserte datasettet. `154345` følger valgt rapportperiode.
+Lønnsandelen er korrigert etter brukerbeslutning 8. september 2026, med
+regelversjon `2026-09-08`. Begge finansieringsgruppene bruker lønn delt på
+andre driftskostnader. Avskrivninger (`6000–6109`) inngår ikke i nevneren.
+Andelen kan være større enn 100 prosent; null i nevneren gir manglende verdi.
+Kortet viser nevneren uttrykkelig. `154345` følger valgt rapportperiode.
 
-Excel-fasiten bruker den tidligere ADK-nevneren for lønnsandel på
-`154322+045101`. Den godkjente regelen gir derfor et forventet, dokumentert
-avvik i denne cellen. Testen kontrollerer at beregningen ikke endres tilbake til
-den gamle Excel-regelen.
+Budsjettunntaket for den dobbeltførte posten `5219663` på `711` i `2026RV`
+gjelder også oppgave 1. Erstatningsposten `5733017` på `771` beholdes.
+Se `DATA.md` for avgrensningen. Finansiering bestemmes fortsatt av `dim_4`.
+
+Excel-fasiten er et uendret, uavhengig historisk testorakel. C15 bruker den
+eldre nevneren med totale kostnader og kan ikke avstemme den nye ADK-andelen.
+C32 bruker ADK-nevneren. Budsjettceller fra opprinnelig budsjett kan avvike
+fra 2026RV og det bekreftede duplikatunntaket; slike avvik skal dokumenteres.
 
 ## Testbevis
 
@@ -57,7 +64,7 @@ den gamle Excel-regelen.
 
 - sammenligner 12 fortsatt gjeldende dashboardverdier mot Excel;
 - kontrollerer regnestykket og kildemerkingen på alle 27 KPI-rader;
-- krever at konto `7400` og den avledede lønnsandelen matcher etter oppdatering
+- krever at konto `7400` matcher etter oppdatering
   til hovedboksnapshotet fra 14. juli 2026;
 - kontrollerer manglende Testlab-budsjett;
 - lager et alternativt hovedboksgrunnlag og beviser at berørte KPI-er endres
@@ -102,3 +109,9 @@ De fire KPI-beslutningene er godkjent og datert i
 `docs/faglig-godkjenning.md`. Det gjenstår å registrere godkjennerens navn og å
 få faktisk uttrekkstidspunkt og periodestatus fra den operative dataleveransen;
 lokal filendring brukes ikke som erstatning for dette.
+
+`kode/tests/e2e/budgetFinancing.spec.js` laster de faktiske tolv filene i alle
+tre apper og avstemmer budsjettene med uavhengig DuckDB-SQL som utelater kun
+den bekreftede posten. Oppgave 1 avstemmes også for begge lønnsandelene.
+`tests/financing.test.mjs` kontrollerer avgrensningen av unntaket, ADK-kontogrenser,
+null i nevneren og andeler over 100 prosent.

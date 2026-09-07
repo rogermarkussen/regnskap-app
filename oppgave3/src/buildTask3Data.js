@@ -1,3 +1,4 @@
+import { budgetInclusionSql } from '../../shared/budgetExclusions.js';
 import { openLocalDuckDb } from './localDuckDb.js';
 import { budgetVersionSql } from '../../shared/budgetVersion.js';
 import { financingSql, requireBudgetFinancing } from '../../shared/financing.js';
@@ -37,7 +38,8 @@ with closed_periods as (
     sum(coalesce(try_cast(v.amount as double), try_cast(v.amount1 as double))) as budsjett_nok
   from read_parquet('apltransact.parquet') h
   join read_parquet('apltransactvalue.parquet') v using (trans_id)
-  where h.version = ${budgetVersionSql("substr(trim(v.period), 1, 4)")}
+  where ${budgetInclusionSql()}
+    and h.version = ${budgetVersionSql("substr(trim(v.period), 1, 4)")}
     and regexp_matches(trim(v.period), '^20[0-9]{2}(0[1-9]|1[0-2])$')
   group by 1, 2, 3, 4 having kategori is not null
 ), monthly as (

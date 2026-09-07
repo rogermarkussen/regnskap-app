@@ -17,6 +17,7 @@ except ImportError:
     from task3_rules import load_task3_rules
 
 
+from shared.budget_exclusions import budget_inclusion_sql
 from shared.budget_version import budget_version_for_year
 
 
@@ -181,7 +182,8 @@ def _summary_frame(
           sum({budget_amount}) as amount_nok
         from read_parquet('{budget_header_path.as_posix()}') h
         join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-        where h.version = '{budget_version}'
+        where {budget_inclusion_sql()}
+          and h.version = '{budget_version}'
           and trim(v.period) between ? and ?
         group by h.dim_1, finansiering, kategori, v.period
         having kategori is not null

@@ -541,3 +541,7 @@ Kontrollen krever blant annet at:
 - uavklarte aktive malverdier ikke dukker opp i andre rapportark;
 - publiserte summer kan beregnes på nytt fra operative Parquet-kilder; og
 - avvik alltid er budsjett minus hovedbok.
+
+Budsjettunntak 08.09.2026: `2026RV`-post `5219663` på koststed `711`
+utelates etter bekreftet dobbeltføring. `5733017` på `771` beholdes.
+Se `DATA.md` for felles regel og sporbarhet.

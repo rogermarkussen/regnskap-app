@@ -27,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from shared.data_contract import load_data_contract
+from shared.budget_version import budget_version_for_year
 
 
 FASIT = load_data_contract(REPO_ROOT).path("fasit.dashboard_kpi")
@@ -140,14 +141,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
         expected_adk = float(self.fasit["C10"].value)
         self.assertAlmostEqual(calculated_adk, expected_adk, delta=0.00001)
 
-        calculated_ratio = self.value(
-            "202603",
-            "154301",
-            "Lønnsandel av totale kostnader",
-            "prosentverdi",
-        )
-        expected_ratio = float(self.fasit["C15"].value)
-        self.assertAlmostEqual(calculated_ratio, expected_ratio, delta=1e-10)
+        # Excel C15 bruker den historiske total-kost-nevneren og er ikke
+        # et orakel for den nye ADK-andelen. Fasiten beholdes uendret.
 
     def test_alle_kortlinjer_har_sporbart_regnestykke(self) -> None:
         rows_per_period = self.aggregate.groupby("period_key").size()
@@ -162,7 +157,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
         for row in self.aggregate.itertuples():
             with self.subTest(period=row.period_key, metric=row.metric):
                 details = json.loads(row.grunnlag_json)
-                if row.metric == "Lønnsandel av totale kostnader":
+                if row.metric == "Lønnsandel av andre driftskostnader":
                     if math.isnan(float(row.prosentverdi)):
                         self.assertEqual(float(details[1]["value"]), 0.0)
                         continue
@@ -202,7 +197,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
 
     def test_godkjente_forretningsregler_er_versjonert(self) -> None:
         self.assertEqual(set(self.calculated["regelversjon"]), {BUSINESS_RULE_VERSION})
-        expected_versions = self.calculated["period_key"].str[:4] + "B"
+        expected_versions = self.calculated["period_key"].str[:4].map(budget_version_for_year)
         self.assertTrue(
             (self.calculated["budsjettversjon"] == expected_versions).all()
         )
@@ -216,14 +211,14 @@ class Task1ExcelFasitTest(unittest.TestCase):
             (self.calculated["section_code"] == "all")
             & (self.calculated["period_key"] == "202603")
             & (self.calculated["finansiering"] == "154322+045101")
-            & (self.calculated["metric"] == "Lønnsandel av totale kostnader")
+            & (self.calculated["metric"] == "Lønnsandel av andre driftskostnader")
         ].iloc[0]
-        self.assertEqual(ratio["beregningsregel"], "konto 5000–5999 / konto 5000–7834")
-        self.assertNotAlmostEqual(
+        self.assertEqual(ratio["beregningsregel"], "konto 5000–5999 / konto 6110–7834")
+        self.assertAlmostEqual(
             float(ratio["prosentverdi"]),
             float(self.fasit["C32"].value),
             places=8,
-            msg="Godkjent total-kost-nevner skal ikke endres tilbake til gammel Excel-regel",
+            msg="ADK-nevneren skal følge den uavhengige Excel-formelen for denne cellen",
         )
 
         testlab = self.calculated[
@@ -299,8 +294,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
             1.0,
         )
         self.assertNotEqual(
-            metric(after, "Lønnsandel av totale kostnader")["prosentverdi"],
-            metric(before, "Lønnsandel av totale kostnader")["prosentverdi"],
+            metric(after, "Lønnsandel av andre driftskostnader")["prosentverdi"],
+            metric(before, "Lønnsandel av andre driftskostnader")["prosentverdi"],
         )
         self.assertEqual(
             metric(after, "Overtid")["hovedbok_nok1000"],

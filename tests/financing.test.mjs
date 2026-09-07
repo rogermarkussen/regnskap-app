@@ -69,3 +69,52 @@ test('gamle budsjettuttrekk uten dim_4 avvises før beregningen', async () => {
     budgetValue: { name: 'apltransactvalue.parquet', rows: [{ trans_id: '1', period: '202601', amount: 20 }] }
   }), /dim_4/);
 });
+
+test('budsjettunntaket gjelder bare bekreftet transaksjon, versjon og koststed', async () => {
+  const { includeBudgetHeader, budgetInclusionSql } = await import('../shared/budgetExclusions.js');
+  const sql = `select *, ${budgetInclusionSql()} included from (values
+    ('5219663','2026RV','711'), ('5733017','2026RV','771'), ('42','2026RV','711'),
+    ('5219663','2026B','711'), ('5219663','2027B','711'), ('5219663','2026RV','771'),
+    (NULL,'2026RV','711'), ('5219663','2026RV',NULL), ('5219663',NULL,'711')
+  ) h(trans_id,version,dim_1)`;
+  const rows = JSON.parse(execFileSync('duckdb', ['-json','-c',sql], { encoding: 'utf8' }));
+  assert.deepEqual(rows.map(row => row.included), [false,true,true,true,true,true,true,true,true]);
+  for (const row of rows) assert.equal(includeBudgetHeader(row), row.included);
+  const source = {
+    actualRows: [{ account:'6730', dim_1:'711', dim_4:'154301', period:'202601', amount:10 }],
+    budgetHeaderRows: rows.slice(0,3).map(row => ({ ...row, account:'6730', dim_4:'154301' })),
+    budgetValueRows: rows.slice(0,3).map((row,index) => ({ trans_id:row.trans_id, period:'202601', amount:[3000,3000,700][index] })),
+    dimensionRows: []
+  };
+  for (const build of [buildDashboardRowsFromSources, buildSectionDashboardRowsFromSources]) {
+    const result=build(source);
+    const adk=(section)=>result.find(row=>row.period_key==='202601' && row.metric==='ADK' && row.finansiering==='154301' && (!row.section_code || row.section_code===section));
+    assert.equal(adk('all').budsjett_nok1000, 3.7);
+    if (build===buildSectionDashboardRowsFromSources) {
+      assert.equal(adk('711').budsjett_nok1000, 0.7);
+      assert.equal(adk('771').budsjett_nok1000, 3);
+    }
+  }
+});
+
+test('lønnsandel bruker ADK, kan overstige 100 prosent og er tom ved null ADK', () => {
+  const source = {
+    actualRows: ['154301','154322','045101'].flatMap(dim_4 => [
+      {account:'5000',amount:2000}, {account:'5999',amount:1000},
+      {account:'6000',amount:7000}, {account:'6109',amount:8000},
+      {account:'6110',amount:900}, {account:'7834',amount:100}, {account:'7835',amount:9000}
+    ].map(row=>({...row, dim_4, dim_1:'711',period:'202601'}))),
+    budgetHeaderRows:[],budgetValueRows:[],dimensionRows:[]
+  };
+  for (const build of [buildDashboardRowsFromSources, buildSectionDashboardRowsFromSources]) {
+    const ratios=build(source).filter(row=>row.tittel==='Lønnsandel');
+    assert.ok(ratios.length>0);
+    for (const row of ratios) {
+      assert.equal(row.metric,'Lønnsandel av andre driftskostnader');
+      assert.equal(row.prosentverdi,3);
+      assert.equal(row.beregningsregel,'konto 5000–5999 / konto 6110–7834');
+    }
+    const noAdk={...source,actualRows:source.actualRows.filter(row=>Number(row.account)<6110)};
+    assert.ok(build(noAdk).filter(row=>row.tittel==='Lønnsandel').every(row=>row.prosentverdi===null));
+  }
+});

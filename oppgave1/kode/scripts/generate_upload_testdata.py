@@ -20,11 +20,11 @@ CALCULATION_RULES = {
     ("154301", "Konsulent"): "konto 6700, 6710, 6720, 6730, 6731, 6732",
     ("154301", "Reise"): "konto 7100, 7130, 7131, 7150, 7190, 7199",
     ("154301", "Overtid"): "konto 5050, 5150",
-    ("154301", "Lønnsandel"): "konto 5000–5999 / konto 5000–7834",
+    ("154301", "Lønnsandel"): "konto 5000–5999 / konto 6110–7834",
     ("154345", "Totalt regnskap vs budsjett"): "konto 6110–7834",
     ("154322+045101", "ADK"): "konto 6110–7834",
     ("154322+045101", "Testlab prosjekt 7114"): "konto 5000–7834, prosjekt 7114",
-    ("154322+045101", "Lønnsandel"): "konto 5000–5999 / konto 5000–7834",
+    ("154322+045101", "Lønnsandel"): "konto 5000–5999 / konto 6110–7834",
 }
 
 SIMPLE_ROWS = [
@@ -110,7 +110,7 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
         "Konsulent": "Konsulentkostnader",
         "Reise": "Reisekostnader",
         "Testlab prosjekt 7114": "Testlab",
-        "Lønnsandel": "Lønnsandel av totale kostnader",
+        "Lønnsandel": "Lønnsandel av andre driftskostnader",
     }
     rows: list[dict[str, object]] = []
     for period_key, factor in PERIODS.items():
@@ -124,7 +124,7 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
                     value = min(1.0, value + 0.10)
                 details = [
                     {"label": "Lønnskostnader", "value": round(value * 1000, 6)},
-                    {"label": "Totale kostnader", "value": 1000},
+                    {"label": "Andre driftskostnader", "value": 1000},
                     {"label": "Andel (%)", "value": round(value * 100, 6), "format": "pct"},
                 ]
                 rows.append({
@@ -147,7 +147,7 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
                     ),
                     "grunnlag_json": json.dumps(details, ensure_ascii=False),
                     "beregningsregel": CALCULATION_RULES[(financing, title)],
-                    "regelversjon": "2026-09-07",
+                    "regelversjon": "2026-09-08",
                     "budsjettversjon": "2026RV",
                 })
                 continue
@@ -182,7 +182,7 @@ def calculated_records(scenario: str = "blandet") -> list[dict[str, object]]:
                     ensure_ascii=False,
                 ),
                 "beregningsregel": CALCULATION_RULES[(financing, title)],
-                "regelversjon": "2026-09-07",
+                "regelversjon": "2026-09-08",
                 "budsjettversjon": "2026RV",
             })
     return rows

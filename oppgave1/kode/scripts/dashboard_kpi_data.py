@@ -19,6 +19,7 @@ try:
 except ImportError:
     from project_data import task1_sources
 
+from shared.budget_exclusions import budget_inclusion_sql
 from shared.financing import report_financing
 from shared.budget_version import budget_version_for_year, budget_version_sql
 
@@ -44,7 +45,7 @@ class SectionScope:
     sort_order: int
 
 
-BUSINESS_RULE_VERSION = "2026-09-07"
+BUSINESS_RULE_VERSION = "2026-09-08"
 
 MONTH_NAMES = (
     "Januar",
@@ -138,7 +139,8 @@ def build_dashboard_kpi_metadata_frame(root: Path) -> pd.DataFrame:
               ) as ugyldige_belop
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
+            where {budget_inclusion_sql()}
+              and h.version = {budget_version_sql("substr(trim(v.period), 1, 4)")}
               and regexp_matches(trim(v.period), '^[0-9]{{6}}$')
               and try_cast(substr(trim(v.period), 5, 2) as integer) between 1 and 12
             """
@@ -205,10 +207,10 @@ METRIC_RULES = (
     MetricRule("154301", "Overtid", "Overtid", accounts=("5050", "5150")),
     MetricRule(
         "154301",
-        "Lønnsandel av totale kostnader",
+        "Lønnsandel av andre driftskostnader",
         "Lønnsandel",
         ratio_numerator=(5000, 5999),
-        ratio_denominator=(5000, 7834),
+        ratio_denominator=(6110, 7834),
     ),
     MetricRule(
         "154345",
@@ -228,10 +230,10 @@ METRIC_RULES = (
     ),
     MetricRule(
         "154322+045101",
-        "Lønnsandel av totale kostnader",
+        "Lønnsandel av andre driftskostnader",
         "Lønnsandel",
         ratio_numerator=(5000, 5999),
-        ratio_denominator=(5000, 7834),
+        ratio_denominator=(6110, 7834),
     ),
 )
 
@@ -282,7 +284,8 @@ def _read_sources(
               {budget_amount} / 1000.0 as amount_tusen
             from read_parquet('{budget_header_path.as_posix()}') h
             join read_parquet('{budget_value_path.as_posix()}') v using (trans_id)
-            where h.version = {budget_version_sql("substr(trim(cast(v.period as varchar)), 1, 4)")}
+            where {budget_inclusion_sql()}
+              and h.version = {budget_version_sql("substr(trim(cast(v.period as varchar)), 1, 4)")}
               and regexp_matches(trim(cast(v.period as varchar)), '^[0-9]{{6}}$')
               and try_cast(substr(trim(cast(v.period as varchar)), 5, 2) as integer)
                   between 1 and 12
@@ -466,7 +469,7 @@ def build_dashboard_kpi_frame(
                     details = [
                         {"label": "Lønnskostnader", "value": numerator},
                         {
-                            "label": "Totale kostnader",
+                            "label": "Andre driftskostnader",
                             "value": denominator,
                         },
                     ]

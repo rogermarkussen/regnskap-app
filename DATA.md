@@ -82,12 +82,23 @@ REGNSKAP_COMMON_DATA_FOLDER="$PWD/data/lokaldata" npm run test:upload-apps
 ```
 
 Alle tre apper bruker `apltransact.dim_4` som budsjettets finansiering.
-Koststed (`dim_1`) brukes bare til seksjonsutvalg, aldri som reserveverdi for
-finansiering. `154322` og `045101` vises fortsatt samlet. Tom kode vises som
+Koststed (`dim_1`) brukes til seksjonsutvalg og det avgrensede
+budsjettunntaket nedenfor, aldri til å bestemme finansiering. `154322` og `045101` vises fortsatt samlet. Tom kode vises som
 `Uten finansiering`. Andre koder beholdes og kan velges i kontogrupperingen.
 Opplastingen avviser budsjettfiler der hele `dim_4`-kolonnen mangler.
 Rapportåret 2026 bruker utelukkende revidert budsjett (`2026RV`), uten reserveverdi
 fra `2026B`. Tidligere rapportår beholder opprinnelig budsjett (`ÅÅÅÅB`).
+
+Etter uttrykkelig brukerbeslutning 8. september 2026 utelates budsjettposten
+med `version = 2026RV`, `trans_id = 5219663` og `dim_1 = 711` i alle tre
+oppgaver, både i nettleseren og i Python-beregningene. Posten er dobbeltført
+etter flytting: `5733017` på `771` beholdes, og øvrige poster på `711` beholdes.
+Unntaket finnes i `shared/budgetExclusions.js` og `shared/budget_exclusions.py`.
+Det trekker fra postens operative periodebeløp, ikke et hardkodet beløp.
+For dette snapshotet reduseres årsbudsjettet med 3 000 000 kroner. Råfilene
+og kontrollsummene beholdes uendret. Unntaket bygger på kildekontroll og
+brukerbeslutningen, ikke Excel-fasit.
+
 
 Dette nye opplastingssnapshotet erstatter ikke de historiske `common.*`- og
 fasitoppføringene. Det eldre komplette testløpet og internbygget krever fortsatt
