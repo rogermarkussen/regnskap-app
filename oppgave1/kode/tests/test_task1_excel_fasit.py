@@ -141,8 +141,10 @@ class Task1ExcelFasitTest(unittest.TestCase):
         expected_adk = float(self.fasit["C10"].value)
         self.assertAlmostEqual(calculated_adk, expected_adk, delta=0.00001)
 
-        # Excel C15 bruker den historiske total-kost-nevneren og er ikke
-        # et orakel for den nye ADK-andelen. Fasiten beholdes uendret.
+        calculated_ratio = self.value(
+            "202603", "154301", "Lønnsandel av totale kostnader", "prosentverdi"
+        )
+        self.assertAlmostEqual(calculated_ratio, float(self.fasit["C15"].value), delta=1e-10)
 
     def test_alle_kortlinjer_har_sporbart_regnestykke(self) -> None:
         rows_per_period = self.aggregate.groupby("period_key").size()
@@ -157,7 +159,7 @@ class Task1ExcelFasitTest(unittest.TestCase):
         for row in self.aggregate.itertuples():
             with self.subTest(period=row.period_key, metric=row.metric):
                 details = json.loads(row.grunnlag_json)
-                if row.metric == "Lønnsandel av andre driftskostnader":
+                if row.metric == "Lønnsandel av totale kostnader":
                     if math.isnan(float(row.prosentverdi)):
                         self.assertEqual(float(details[1]["value"]), 0.0)
                         continue
@@ -211,14 +213,14 @@ class Task1ExcelFasitTest(unittest.TestCase):
             (self.calculated["section_code"] == "all")
             & (self.calculated["period_key"] == "202603")
             & (self.calculated["finansiering"] == "154322+045101")
-            & (self.calculated["metric"] == "Lønnsandel av andre driftskostnader")
+            & (self.calculated["metric"] == "Lønnsandel av totale kostnader")
         ].iloc[0]
-        self.assertEqual(ratio["beregningsregel"], "konto 5000–5999 / konto 6110–7834")
-        self.assertAlmostEqual(
+        self.assertEqual(ratio["beregningsregel"], "konto 5000–5999 / konto 5000–7834")
+        self.assertNotAlmostEqual(
             float(ratio["prosentverdi"]),
             float(self.fasit["C32"].value),
             places=8,
-            msg="ADK-nevneren skal følge den uavhengige Excel-formelen for denne cellen",
+            msg="Total-kost-nevneren avviker fra ADK-nevneren i den historiske Excel-cellen",
         )
 
         testlab = self.calculated[
@@ -294,8 +296,8 @@ class Task1ExcelFasitTest(unittest.TestCase):
             1.0,
         )
         self.assertNotEqual(
-            metric(after, "Lønnsandel av andre driftskostnader")["prosentverdi"],
-            metric(before, "Lønnsandel av andre driftskostnader")["prosentverdi"],
+            metric(after, "Lønnsandel av totale kostnader")["prosentverdi"],
+            metric(before, "Lønnsandel av totale kostnader")["prosentverdi"],
         )
         self.assertEqual(
             metric(after, "Overtid")["hovedbok_nok1000"],

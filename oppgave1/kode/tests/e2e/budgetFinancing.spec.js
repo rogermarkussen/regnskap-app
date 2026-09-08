@@ -55,12 +55,12 @@ test.describe('budsjettfinansiering ved opplasting', () => {
       const filter = financing === '154301' ? "dim_4='154301'" : "dim_4 in ('154322','045101')";
       const [{ ratio }] = query(`select
         sum(cast(amount as decimal(24,6))) filter (where try_cast(account as integer) between 5000 and 5999)
-        / nullif(sum(cast(amount as decimal(24,6))) filter (where try_cast(account as integer) between 6110 and 7834), 0) ratio
+        / nullif(sum(cast(amount as decimal(24,6))) filter (where try_cast(account as integer) between 5000 and 7834), 0) ratio
         from ${source('agltransact.parquet')} where period between '202601' and ${quote(period)} and ${filter}`);
-      const row = actual.find((row) => row.financing === financing && row.metric === 'Lønnsandel av andre driftskostnader');
+      const row = actual.find((row) => row.financing === financing && row.metric === 'Lønnsandel av totale kostnader');
       expect(row.ratio).toBeCloseTo(Number(ratio), 8);
     }
-    await expect(page.getByText('Lønn / andre driftskostnader', { exact: true })).toHaveCount(2);
+    await expect(page.locator('.ratio-chart')).toHaveCount(2);
   });
 
   test('kontogrupperingen beholder alle finansieringer og totalbudsjettet', async ({ page }) => {

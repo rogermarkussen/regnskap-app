@@ -8,8 +8,9 @@ bety før dataløpet ferdigstilles.
 
 - 07.09.2026: Alle budsjettfinansieringer hentes fra `dim_4`. Den historiske
   koststedsmappingen nedenfor er opphevet. Rapportåret 2026 bruker `2026RV`.
-- 08.09.2026: Begge lønnsandeler beregnes som lønn `5000–5999` delt på andre
-  driftskostnader `6110–7834`. Beslutningen om totale kostnader er opphevet.
+- 08.09.2026, korrigert beslutning: Begge lønnsandeler beregnes igjen som
+  lønn `5000–5999` delt på totale kostnader `5000–7834`. Den midlertidige
+  endringen til bare andre driftskostnader er trukket tilbake av brukeren.
 - 08.09.2026: Kun `2026RV`-post `5219663` på kostnadssted `711` utelates etter
   bekreftet dobbeltføring. `5733017` på `771` beholdes. Se `DATA.md`.
 

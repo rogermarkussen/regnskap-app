@@ -40,23 +40,25 @@ Rapportperiodene er januar–mars, januar–april og januar–juni 2026.
 | Konsulenter | `6700, 6710, 6720, 6730, 6731, 6732` |
 | Reise | `7100, 7130, 7131, 7150, 7190, 7199` |
 | Overtid | `5050, 5150` |
-| Lønnsandel `154301` | `5000–5999 / 6110–7834` |
-| Lønnsandel `154322+045101` | `5000–5999 / 6110–7834` |
+| Lønnsandel `154301` | `5000–5999 / 5000–7834` |
+| Lønnsandel `154322+045101` | `5000–5999 / 5000–7834` |
 
-Lønnsandelen er korrigert etter brukerbeslutning 8. september 2026, med
-regelversjon `2026-09-08`. Begge finansieringsgruppene bruker lønn delt på
-andre driftskostnader. Avskrivninger (`6000–6109`) inngår ikke i nevneren.
-Andelen kan være større enn 100 prosent; null i nevneren gir manglende verdi.
-Kortet viser nevneren uttrykkelig. `154345` følger valgt rapportperiode.
+Lønnsandelen er satt tilbake til den opprinnelige beregningen etter korrigert
+brukerbeslutning 8. september 2026, med regelversjon `2026-09-08-r2`.
+Begge finansieringsgruppene bruker lønn delt på totale kostnader, inkludert
+lønn, avskrivninger og andre driftskostnader (`5000–7834`). Null i nevneren
+gir manglende verdi. Den opprinnelige sirkelvisningen er gjeninnført.
+`154345` følger valgt rapportperiode.
 
 Budsjettunntaket for den dobbeltførte posten `5219663` på `711` i `2026RV`
 gjelder også oppgave 1. Erstatningsposten `5733017` på `771` beholdes.
 Se `DATA.md` for avgrensningen. Finansiering bestemmes fortsatt av `dim_4`.
 
-Excel-fasiten er et uendret, uavhengig historisk testorakel. C15 bruker den
-eldre nevneren med totale kostnader og kan ikke avstemme den nye ADK-andelen.
-C32 bruker ADK-nevneren. Budsjettceller fra opprinnelig budsjett kan avvike
-fra 2026RV og det bekreftede duplikatunntaket; slike avvik skal dokumenteres.
+Excel-fasiten er et uendret, uavhengig historisk testorakel. C15 bruker
+nevneren med totale kostnader. C32 bruker ADK-nevneren og gir derfor et
+forventet avvik fra den gjeldende regelen. Budsjettceller fra opprinnelig
+budsjett kan avvike fra 2026RV og det bekreftede duplikatunntaket; slike
+avvik skal dokumenteres.
 
 ## Testbevis
 
@@ -113,5 +115,5 @@ lokal filendring brukes ikke som erstatning for dette.
 `kode/tests/e2e/budgetFinancing.spec.js` laster de faktiske tolv filene i alle
 tre apper og avstemmer budsjettene med uavhengig DuckDB-SQL som utelater kun
 den bekreftede posten. Oppgave 1 avstemmes også for begge lønnsandelene.
-`tests/financing.test.mjs` kontrollerer avgrensningen av unntaket, ADK-kontogrenser,
-null i nevneren og andeler over 100 prosent.
+`tests/financing.test.mjs` kontrollerer avgrensningen av unntaket, kontogrenser for lønn og totale kostnader,
+inkludering av avskrivninger og null i nevneren.

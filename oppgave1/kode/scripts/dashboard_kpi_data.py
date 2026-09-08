@@ -45,7 +45,7 @@ class SectionScope:
     sort_order: int
 
 
-BUSINESS_RULE_VERSION = "2026-09-08"
+BUSINESS_RULE_VERSION = "2026-09-08-r2"
 
 MONTH_NAMES = (
     "Januar",
@@ -207,10 +207,10 @@ METRIC_RULES = (
     MetricRule("154301", "Overtid", "Overtid", accounts=("5050", "5150")),
     MetricRule(
         "154301",
-        "Lønnsandel av andre driftskostnader",
+        "Lønnsandel av totale kostnader",
         "Lønnsandel",
         ratio_numerator=(5000, 5999),
-        ratio_denominator=(6110, 7834),
+        ratio_denominator=(5000, 7834),
     ),
     MetricRule(
         "154345",
@@ -230,10 +230,10 @@ METRIC_RULES = (
     ),
     MetricRule(
         "154322+045101",
-        "Lønnsandel av andre driftskostnader",
+        "Lønnsandel av totale kostnader",
         "Lønnsandel",
         ratio_numerator=(5000, 5999),
-        ratio_denominator=(6110, 7834),
+        ratio_denominator=(5000, 7834),
     ),
 )
 
@@ -469,7 +469,7 @@ def build_dashboard_kpi_frame(
                     details = [
                         {"label": "Lønnskostnader", "value": numerator},
                         {
-                            "label": "Andre driftskostnader",
+                            "label": "Totale kostnader",
                             "value": denominator,
                         },
                     ]

@@ -71,7 +71,8 @@ test('deler dei ni KPI-ane i eitt hovudområde og to sekundærområde', async ({
   await expect(page.locator('.ratio-visual')).toHaveCount(2);
   await expect(page.getByRole('img', { name: /Lønnsandel: \d+%/ })).toHaveCount(2);
   await expect(page.getByText('Øvrige kostnader', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Lønn / andre driftskostnader', { exact: true })).toHaveCount(2);
+  expect(await page.locator('.ratio-chart').first().evaluate((element) => element.clientWidth))
+    .toBeGreaterThanOrEqual(140);
   await expect(page.locator('.dashboard-shell')).not.toHaveClass(/variant-/);
   await expect(page.getByRole('button', { name: /vis versjoner/i })).toHaveCount(0);
 });

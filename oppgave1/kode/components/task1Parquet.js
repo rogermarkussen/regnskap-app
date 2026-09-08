@@ -4,7 +4,7 @@ import { compressors } from 'hyparquet-compressors';
 import { budgetVersionForYear } from '../../../shared/budgetVersion.js';
 import { reportFinancing } from '../../../shared/financing.js';
 
-export const BUSINESS_RULE_VERSION = '2026-09-08';
+export const BUSINESS_RULE_VERSION = '2026-09-08-r2';
 export const BUDGET_VERSION = budgetVersionForYear(2026);
 
 const PERIODS = {
@@ -35,8 +35,8 @@ const METRIC_RULES = [
   },
   { financing: '154301', metric: 'Overtid', title: 'Overtid', accounts: ['5050', '5150'] },
   {
-    financing: '154301', metric: 'Lønnsandel av andre driftskostnader', title: 'Lønnsandel',
-    ratioNumerator: [5000, 5999], ratioDenominator: [6110, 7834]
+    financing: '154301', metric: 'Lønnsandel av totale kostnader', title: 'Lønnsandel',
+    ratioNumerator: [5000, 5999], ratioDenominator: [5000, 7834]
   },
   {
     financing: '154345', metric: 'Totalt regnskap vs budsjett',
@@ -48,8 +48,8 @@ const METRIC_RULES = [
     accountFrom: 5000, accountTo: 7834, project: '7114'
   },
   {
-    financing: '154322+045101', metric: 'Lønnsandel av andre driftskostnader', title: 'Lønnsandel',
-    ratioNumerator: [5000, 5999], ratioDenominator: [6110, 7834]
+    financing: '154322+045101', metric: 'Lønnsandel av totale kostnader', title: 'Lønnsandel',
+    ratioNumerator: [5000, 5999], ratioDenominator: [5000, 7834]
   }
 ];
 
@@ -169,7 +169,7 @@ export const buildSectionDashboardRowsFromSources = ({
           const ratio = denominator ? numerator / denominator : null;
           const details = [
             { label: 'Lønnskostnader', value: numerator },
-            { label: 'Andre driftskostnader', value: denominator }
+            { label: 'Totale kostnader', value: denominator }
           ];
           if (ratio !== null) details.push({ label: 'Andel (%)', value: ratio * 100, format: 'pct' });
           result.push({
@@ -392,7 +392,7 @@ export const validateCalculatedRows = (inputRows) => {
 
     if (rule.ratioNumerator) {
       const numerator = details.find((detail) => detail.label === 'Lønnskostnader');
-      const denominator = details.find((detail) => detail.label === 'Andre driftskostnader');
+      const denominator = details.find((detail) => detail.label === 'Totale kostnader');
       if (!numerator || !denominator) {
         throw new Error(`Ufullstendig prosentgrunnlag for ${key}`);
       }
@@ -482,7 +482,7 @@ export const buildDashboardRowsFromSources = ({ actualRows, budgetHeaderRows, bu
         const ratio = denominator ? numerator / denominator : null;
         const details = [
           { label: 'Lønnskostnader', value: numerator },
-          { label: 'Andre driftskostnader', value: denominator }
+          { label: 'Totale kostnader', value: denominator }
         ];
         if (ratio !== null) details.push({ label: 'Andel (%)', value: ratio * 100, format: 'pct' });
         result.push({

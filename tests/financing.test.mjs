@@ -97,7 +97,7 @@ test('budsjettunntaket gjelder bare bekreftet transaksjon, versjon og koststed',
   }
 });
 
-test('lønnsandel bruker ADK, kan overstige 100 prosent og er tom ved null ADK', () => {
+test('lønnsandel bruker totale kostnader og er tom ved null totalkostnad', () => {
   const source = {
     actualRows: ['154301','154322','045101'].flatMap(dim_4 => [
       {account:'5000',amount:2000}, {account:'5999',amount:1000},
@@ -110,11 +110,11 @@ test('lønnsandel bruker ADK, kan overstige 100 prosent og er tom ved null ADK',
     const ratios=build(source).filter(row=>row.tittel==='Lønnsandel');
     assert.ok(ratios.length>0);
     for (const row of ratios) {
-      assert.equal(row.metric,'Lønnsandel av andre driftskostnader');
-      assert.equal(row.prosentverdi,3);
-      assert.equal(row.beregningsregel,'konto 5000–5999 / konto 6110–7834');
+      assert.equal(row.metric,'Lønnsandel av totale kostnader');
+      assert.ok(Math.abs(row.prosentverdi - 3 / 19) < 1e-12);
+      assert.equal(row.beregningsregel,'konto 5000–5999 / konto 5000–7834');
     }
-    const noAdk={...source,actualRows:source.actualRows.filter(row=>Number(row.account)<6110)};
-    assert.ok(build(noAdk).filter(row=>row.tittel==='Lønnsandel').every(row=>row.prosentverdi===null));
+    const noCosts={...source,actualRows:source.actualRows.filter(row=>Number(row.account)>7834)};
+    assert.ok(build(noCosts).filter(row=>row.tittel==='Lønnsandel').every(row=>row.prosentverdi===null));
   }
 });
