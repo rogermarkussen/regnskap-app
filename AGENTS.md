@@ -44,7 +44,7 @@ dokumentasjon.
 ## JJ / Gitea / GitHub
 
 - Bruk Jujutsu (`jj`) for alle lokale versjonskontrolloperasjoner. Ikke bruk `git`-CLI.
-- Lokal Gitea er primær forge og `origin`: `http://127.0.0.1:3000/admin/Regnskap-app` (`admin/Regnskap-app`).
+- Lokal Gitea er primær forge og `origin`: `http://localhost:3000/rogermarkussen/regnskap-app` (`rogermarkussen/regnskap-app`).
 - GitHub er et enveis push-speil: `https://github.com/rogermarkussen/regnskap-app` (`rogermarkussen/regnskap-app`). Ikke push direkte til `github`.
 - Standard bookmark er `main`. Fetch og push skal gå mot `origin`; Gitea speiler videre til GitHub ved commit.
 - Bruk Gitea MCP for støttede Gitea-operasjoner som repository-metadata, issues, pull requests, releases, labels, milestones, brukere, organisasjoner og hooks. Bruk Gitea REST API bare når MCP-en mangler nødvendig operasjon, særlig administrasjon av push-speil.
